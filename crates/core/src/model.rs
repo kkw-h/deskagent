@@ -37,6 +37,9 @@ pub struct Config {
     /// Saved layouts the user can return to (Fences "snapshots").
     #[serde(default)]
     pub snapshots: Vec<Snapshot>,
+    /// 用户拖出来的纠正（公司名/文件名 → 栅栏标题），语义整理先查它。
+    #[serde(default, skip_serializing_if = "crate::learn::Learnings::is_empty")]
+    pub learnings: crate::learn::Learnings,
 }
 
 impl Default for Config {
@@ -50,6 +53,7 @@ impl Default for Config {
             rules: crate::rules::RuleSet::default(),
             undo_log: Vec::new(),
             snapshots: Vec::new(),
+            learnings: crate::learn::Learnings::default(),
         }
     }
 }

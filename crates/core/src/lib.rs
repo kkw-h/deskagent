@@ -7,6 +7,7 @@ pub mod date_group;
 pub mod geometry;
 pub mod hotkey;
 pub mod i18n;
+pub mod learn;
 pub mod model;
 pub mod rules;
 pub mod updates;

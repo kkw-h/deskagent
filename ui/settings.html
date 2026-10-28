@@ -471,7 +471,8 @@
       <div id="semanticPreview" class="card stack" hidden>
         <div class="l"><div><div class="t">分组预览</div><div class="s" id="semanticSummary"></div></div></div>
         <div class="rows" id="semanticGroups"></div>
-        <div class="newrule-foot"><button id="semanticCancel">取消</button><button class="accent" id="semanticApply">确认并整理</button></div>
+        <div class="s" id="semanticLearned" hidden></div>
+        <div class="newrule-foot"><button id="semanticForget" hidden>清除记忆</button><button id="semanticCancel">取消</button><button class="accent" id="semanticApply">确认并整理</button></div>
       </div>
       <h3>快速添加</h3>
       <div class="card stack"><div class="l"><span class="ic">&#xE8F4;</span><div><div class="t">一键创建栅栏并添加规则</div><div class="s">“待清理”只归拢 30 天没用过的安装包和压缩包，不删除任何文件</div></div></div>
@@ -1217,11 +1218,18 @@
       div.innerHTML = `<div class="s">${esc(tf("整理后清理 {0} 个空栅栏：{1}", prune.length, prune.map(p => p.title).join(t("、"))))}</div>`;
       list.appendChild(div);
     }
+    // 用户拖出来的纠正：有几条、能不能一键忘掉。
+    const learned = Number(plan.learned || 0);
+    const learnedLine = document.getElementById('semanticLearned');
+    learnedLine.hidden = !learned;
+    learnedLine.textContent = learned ? tf("已记住 {0} 条纠正", learned) : '';
+    document.getElementById('semanticForget').hidden = !learned;
     document.getElementById('semanticPreview').hidden = false;
     document.getElementById('semanticApply').disabled = !groups.length && !prune.length;
   }
   document.getElementById('semanticPlan').onclick = () => send({ type: 'action', name: 'semanticsPlan' });
   document.getElementById('semanticCancel').onclick = () => { document.getElementById('semanticPreview').hidden = true; };
+  document.getElementById('semanticForget').onclick = () => send({ type: 'action', name: 'semanticsForget' });
   document.getElementById('semanticApply').onclick = () => { document.getElementById('semanticPreview').hidden = true; send({ type: 'action', name: 'semanticsApply' }); };
   document.querySelectorAll('#templates [data-template]').forEach(b => { b.onclick = () => send({ type: 'action', name: 'addTemplate', template: b.dataset.template }); });
   document.getElementById('snapSave').onclick = () => { const n = document.getElementById('snapName').value; send({ type: 'action', name: 'saveSnapshot', snapshotName: n }); document.getElementById('snapName').value = ''; };

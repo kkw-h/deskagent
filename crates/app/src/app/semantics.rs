@@ -32,7 +32,11 @@ impl App {
 
     /// 只计算不修改：给设置页预览用。
     pub(super) fn semantic_plan_json(&self, min_items: usize) -> Value {
-        let plan = sem::plan(&self.semantic_entries(), min_items);
+        let plan = sem::plan(
+            &self.semantic_entries(),
+            min_items,
+            &self.state.config.learnings,
+        );
         let prune = self.fences_emptied_by(&plan);
         // 预览也会写一行日志：没有设置窗口时（脚本、CLI）它是唯一能看到结果的途径。
         tracing::info!(
@@ -75,6 +79,8 @@ impl App {
                 .iter()
                 .map(|p| json!({ "id": p.id.to_string(), "title": p.title, "rules": p.rules }))
                 .collect::<Vec<_>>(),
+            // 用户拖出来的纠正条数：面板据此显示「已记住 N 条」。
+            "learned": self.state.config.learnings.len(),
         })
     }
 
@@ -128,7 +134,11 @@ impl App {
         min_items: usize,
         prune_empty: bool,
     ) -> std::result::Result<Value, IpcError> {
-        let plan = sem::plan(&self.semantic_entries(), min_items);
+        let plan = sem::plan(
+            &self.semantic_entries(),
+            min_items,
+            &self.state.config.learnings,
+        );
         let emptied = if prune_empty {
             self.fences_emptied_by(&plan)
         } else {
@@ -267,7 +277,7 @@ impl App {
         if pool.is_empty() {
             return;
         }
-        let plan = sem::plan(&pool, 1);
+        let plan = sem::plan(&pool, 1, &self.state.config.learnings);
         let mut created = 0usize;
         let mut moved = 0usize;
         let mut near: Option<FenceId> = None;

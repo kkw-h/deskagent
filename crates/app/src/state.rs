@@ -2090,6 +2090,8 @@ impl AppState {
         self.portal_cwd.remove(&id);
         self.portal_missing.remove(&id);
         self.evict_portal_members(id);
+        // 指向这个栅栏的学习记录也失效了：留着下次会凭空长回一个同名栅栏。
+        self.config.learnings.forget_group(&removed.title);
         let ids: Vec<ItemId> = removed.items.iter().map(|r| r.item_id).collect();
         for item in ids {
             self.config

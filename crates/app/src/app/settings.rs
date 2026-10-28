@@ -532,6 +532,15 @@ impl App {
                         Err(e) => self.settings_error(&e.to_string()),
                     }
                 }
+                Some("semanticsForget") => {
+                    // 只清记忆，不动布局：条目留在它们现在所在的栅栏里。
+                    if !self.state.config.learnings.is_empty() {
+                        self.state.config.learnings.clear();
+                        self.state.mark_dirty();
+                        self.schedule_save();
+                        self.settings_toast(pecofence_core::i18n::text("已清除学习记录"));
+                    }
+                }
                 Some("addTemplate") => {
                     if let Some(template) = v
                         .get("template")

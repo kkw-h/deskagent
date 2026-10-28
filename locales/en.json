@@ -562,5 +562,8 @@
   "已按软件语义整理 {0} 个项目": "Organized {0} items by what they are",
   "先看快捷方式目标规则，再按软件语义归类；都不符合的放进“桌面”栅栏": "Checks shortcut-target rules first, then groups by what each app is; anything left goes to the “Desktop” fence",
   "已按软件语义整理 {0} 个项目，清掉 {1} 个空栅栏": "Organized {0} items by what they are, clearing {1} empty fences",
-  "整理后清理 {0} 个空栅栏：{1}": "Clears {0} empty fences: {1}"
+  "整理后清理 {0} 个空栅栏：{1}": "Clears {0} empty fences: {1}",
+  "已记住 {0} 条纠正": "Learned from {0} of your corrections",
+  "清除记忆": "Forget",
+  "已清除学习记录": "Learning history cleared"
 }

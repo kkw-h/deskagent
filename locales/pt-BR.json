@@ -562,5 +562,8 @@
   "已按软件语义整理 {0} 个项目": "{0} itens organizados pelo tipo de aplicativo",
   "先看快捷方式目标规则，再按软件语义归类；都不符合的放进“桌面”栅栏": "Verifica primeiro as regras de destino dos atalhos e depois agrupa pelo tipo de aplicativo; o que sobrar vai para a cerca “Área de Trabalho”",
   "已按软件语义整理 {0} 个项目，清掉 {1} 个空栅栏": "{0} itens organizados pelo tipo de aplicativo, {1} cercas vazias removidas",
-  "整理后清理 {0} 个空栅栏：{1}": "Remove {0} cercas vazias: {1}"
+  "整理后清理 {0} 个空栅栏：{1}": "Remove {0} cercas vazias: {1}",
+  "已记住 {0} 条纠正": "{0} correções memorizadas",
+  "清除记忆": "Esquecer",
+  "已清除学习记录": "Histórico de aprendizado apagado"
 }

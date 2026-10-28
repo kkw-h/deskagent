@@ -109,8 +109,34 @@ pub fn item_for(entry: &DesktopEntry) -> Option<Item> {
     })
 }
 
+/// 目标可执行文件的公司名；不是快捷方式/不是 .exe/读不到时为空。
+///
+/// 与 [`item_for`] 用的是同一套取法，只是入口是一个路径（用户拖动时手上只有它）。
+pub fn company_of(path: &std::path::Path) -> String {
+    let target = if path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("lnk"))
+    {
+        shell::shortcut_target(path).unwrap_or_default()
+    } else {
+        path.to_string_lossy().into_owned()
+    };
+    if !target.to_lowercase().ends_with(".exe") {
+        return String::new();
+    }
+    deskagent_scan::read_version(&target)
+        .map(|v| v.company)
+        .unwrap_or_default()
+}
+
 /// 分类 `entries`，按 `min_items` 决定多小的分组不值得建栅栏。
-pub fn plan(entries: &[DesktopEntry], min_items: usize) -> Plan {
+///
+/// `learn` 是用户拖出来的纠正：它先于规则包，因为那是明确的偏好，不是猜测。
+pub fn plan(
+    entries: &[DesktopEntry],
+    min_items: usize,
+    learn: &pecofence_core::learn::Learnings,
+) -> Plan {
     let pack = pack();
     let min_items = min_items.max(1);
     let mut grouped: BTreeMap<String, Vec<Planned>> = BTreeMap::new();
@@ -127,6 +153,14 @@ pub fn plan(entries: &[DesktopEntry], min_items: usize) -> Plan {
             path: item.path.clone(),
             detail: String::new(),
         };
+        // 用户纠正过就照办；否则才问规则包。
+        if let Some(group) = learn.lookup(&item.company, &item.file_name) {
+            grouped.entry(group.to_string()).or_default().push(Planned {
+                detail: "learned".into(),
+                ..planned
+            });
+            continue;
+        }
         match pack.classify(&item) {
             Some((group, reason)) => {
                 grouped.entry(group).or_default().push(Planned {
@@ -212,7 +246,7 @@ mod tests {
             file("clip.mp4"),
             file("demo.mkv"),
         ];
-        let plan = plan(&entries, DEFAULT_MIN_ITEMS);
+        let plan = plan(&entries, DEFAULT_MIN_ITEMS, &Default::default());
         let titles: Vec<&str> = plan.groups.iter().map(|g| g.title.as_str()).collect();
         // GROUP_ORDER 里 影音 在 办公 之前
         assert_eq!(titles, vec!["影音", "办公"]);
@@ -224,7 +258,7 @@ mod tests {
     #[test]
     fn groups_below_the_threshold_stay_on_the_desktop() {
         let entries = vec![file("renewal.pdf"), file("clip.mp4")];
-        let plan = plan(&entries, 2);
+        let plan = plan(&entries, 2, &Default::default());
         assert!(plan.groups.is_empty());
         assert_eq!(plan.unclassified.len(), 2);
         assert!(
@@ -237,7 +271,7 @@ mod tests {
     #[test]
     fn unknown_extensions_are_reported_not_guessed() {
         let entries = vec![file("mystery.qqq"), file("another.qqq")];
-        let plan = plan(&entries, DEFAULT_MIN_ITEMS);
+        let plan = plan(&entries, DEFAULT_MIN_ITEMS, &Default::default());
         assert!(plan.groups.is_empty());
         assert!(plan.unclassified.iter().all(|p| p.detail == "uncovered"));
     }
@@ -253,7 +287,7 @@ mod tests {
             file("a.pdf"),
             file("b.pdf"),
         ];
-        let plan = plan(&entries, 1);
+        let plan = plan(&entries, 1, &Default::default());
         assert_eq!(plan.total, 2);
         assert_eq!(plan.groups.len(), 1);
     }
@@ -261,8 +295,25 @@ mod tests {
     #[test]
     fn folders_are_not_classified_by_extension() {
         let entries = vec![entry("Projects", EntryOrigin::UserDesktop, true)];
-        let plan = plan(&entries, 1);
+        let plan = plan(&entries, 1, &Default::default());
         assert!(plan.groups.is_empty());
         assert_eq!(plan.unclassified.len(), 1);
+    }
+
+    #[test]
+    fn a_learned_correction_beats_the_rule_pack() {
+        let entries = vec![file("invoice.pdf")];
+        // 规则包会说「办公」，但用户把它拖去过「财务」，记下来的就是财务。
+        // 普通文件没有公司名，所以按文件名记。
+        let mut learn = pecofence_core::learn::Learnings::default();
+        learn.remember("", "invoice.pdf", "财务");
+        let learned = plan(&entries, 1, &learn);
+        assert_eq!(learned.groups.len(), 1);
+        assert_eq!(learned.groups[0].title, "财务");
+        assert_eq!(learned.groups[0].items[0].detail, "learned");
+
+        // 没有这条记忆时仍然是规则包的结果。
+        let plain = plan(&entries, 1, &Default::default());
+        assert_eq!(plain.groups[0].title, "办公");
     }
 }

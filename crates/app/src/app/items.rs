@@ -653,7 +653,50 @@ impl App {
             for id in affected {
                 self.refresh_fence(id);
             }
+            self.learn_from_move(&desktop_items, to);
             self.schedule_save();
+        }
+    }
+
+    /// 记下用户自己把条目拖去了哪个栅栏：语义整理下次先查这张表。
+    ///
+    /// 只记「分到某个栅栏」，不记「拖回桌面」——后者是「别管它」，语义本来就不碰；
+    /// 门户栅栏显示的是磁盘目录，里面的东西不算分类。
+    fn learn_from_move(&mut self, items: &[ItemId], to: FenceId) {
+        if self.state.inbox_id() == Some(to) || self.state.portal_path(to).is_some() {
+            return;
+        }
+        let Some(title) = self.state.fence(to).map(|f| f.title.clone()) else {
+            return;
+        };
+        let mut learned = 0;
+        for id in items {
+            let Some(item) = self.state.item(*id) else {
+                continue;
+            };
+            if item.is_namespace() {
+                continue;
+            }
+            let Some(path) = item.path().map(std::path::Path::new) else {
+                continue;
+            };
+            let company = crate::semantics::company_of(path);
+            let file_name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| item.display_name.clone());
+            if self
+                .state
+                .config
+                .learnings
+                .remember(&company, &file_name, &title)
+            {
+                learned += 1;
+            }
+        }
+        if learned > 0 {
+            tracing::info!(learned, group = %title, "learned from a manual move");
+            self.state.mark_dirty();
         }
     }
 }
