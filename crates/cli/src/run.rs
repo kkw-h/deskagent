@@ -167,21 +167,22 @@ fn watch(
     };
     let mut first: Option<Reply> = None;
     let style = &ctx.style;
-    let finished = pecofence_ipc::client::stream(ctx.instance.as_deref(), method, ctx.timeout_ms, |line| {
-        let reply = match reply_from(line) {
-            Ok(reply) => reply,
-            Err(error) => Reply::new(output::error_payload(&error)),
-        };
-        if !heartbeat && reply.result["event"] == "heartbeat" {
-            return true;
-        }
-        if once {
-            first = Some(reply);
-            return false;
-        }
-        output::print_text(&style.render(&style.shape(reply)), true);
-        true
-    })?;
+    let finished =
+        pecofence_ipc::client::stream(ctx.instance.as_deref(), method, ctx.timeout_ms, |line| {
+            let reply = match reply_from(line) {
+                Ok(reply) => reply,
+                Err(error) => Reply::new(output::error_payload(&error)),
+            };
+            if !heartbeat && reply.result["event"] == "heartbeat" {
+                return true;
+            }
+            if once {
+                first = Some(reply);
+                return false;
+            }
+            output::print_text(&style.render(&style.shape(reply)), true);
+            true
+        })?;
     match (finished, first) {
         (true, Some(event)) => Ok(event),
         (true, None) => Ok(Reply::new(Value::Null)),

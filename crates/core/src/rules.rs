@@ -782,7 +782,10 @@ mod tests {
             other => panic!("期望路由到游戏栅栏，得到 {other:?}"),
         }
         // 没有公司名的条目仍走默认目标
-        assert_eq!(rs.evaluate(&facts("notes.txt")), Decision::Default(Target::Inbox));
+        assert_eq!(
+            rs.evaluate(&facts("notes.txt")),
+            Decision::Default(Target::Inbox)
+        );
     }
 
     #[test]

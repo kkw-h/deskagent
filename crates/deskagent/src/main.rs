@@ -178,11 +178,7 @@ fn main() -> anyhow::Result<()> {
             };
             eval(&items, &labels, rules.as_deref(), &split, json)
         }
-        Cmd::ClassifyJson {
-            input,
-            rules,
-            json,
-        } => classify_json(&input, rules.as_deref(), json),
+        Cmd::ClassifyJson { input, rules, json } => classify_json(&input, rules.as_deref(), json),
         Cmd::Plan {
             dir,
             min_items,
@@ -197,7 +193,15 @@ fn main() -> anyhow::Result<()> {
             llm,
             dry_run,
             yes,
-        } => apply(&dir, min_items, area.as_deref(), with_rules, llm, dry_run, yes),
+        } => apply(
+            &dir,
+            min_items,
+            area.as_deref(),
+            with_rules,
+            llm,
+            dry_run,
+            yes,
+        ),
         Cmd::Rules { dir, json } => rules(&dir, json),
         Cmd::Watch { once } => watch(once),
         Cmd::Resolve { dir, all, json } => resolve(&dir, all, json),
@@ -252,7 +256,11 @@ fn llm_extras(items: &[Item], pack: &RulePack) -> anyhow::Result<Vec<(String, St
     }
 
     let client = llm::Client::new(cfg.clone());
-    eprintln!("模型（{}）：待判断 {} 条", cfg.describe_mode(), pending.len());
+    eprintln!(
+        "模型（{}）：待判断 {} 条",
+        cfg.describe_mode(),
+        pending.len()
+    );
     let suggestions = client.classify(&pending, &candidate_groups())?;
     Ok(suggestions
         .into_iter()
@@ -345,12 +353,7 @@ fn print_rules(c: &compile::rules::Compiled) {
     println!("可沉淀成持久规则的扩展名：{}", c.rules.len());
     println!("{}", "-".repeat(76));
     for r in &c.rules {
-        println!(
-            "{:<24} {} → {}",
-            r.name(),
-            r.exts.join(" "),
-            r.group
-        );
+        println!("{:<24} {} → {}", r.name(), r.exts.join(" "), r.group);
     }
     if !c.conflicts.is_empty() {
         println!("{}", "-".repeat(76));
@@ -497,7 +500,7 @@ fn handle_event(cli: &pecofence::Cli, pack: &RulePack, event: &serde_json::Value
         return;
     }
 
-    match cli.move_items(&[item.path.clone()], &group, false) {
+    match cli.move_items(std::slice::from_ref(&item.path), &group, false) {
         Ok(_) => println!("{} → {group}（{reason}）", item.name),
         Err(e) => eprintln!("{} 归位失败：{e}", item.name),
     }
@@ -757,8 +760,17 @@ fn scan(dirs: &[PathBuf], json: bool) -> anyhow::Result<()> {
     println!("{}", "-".repeat(76));
     for i in &items {
         let mark = if i.target.is_empty() { "!" } else { " " };
-        let company = if i.company.is_empty() { "-" } else { &i.company };
-        println!("{mark} {:<22} {:<26} {}", i.name, trunc(company, 24), i.target);
+        let company = if i.company.is_empty() {
+            "-"
+        } else {
+            &i.company
+        };
+        println!(
+            "{mark} {:<22} {:<26} {}",
+            i.name,
+            trunc(company, 24),
+            i.target
+        );
     }
     Ok(())
 }
@@ -1068,7 +1080,10 @@ fn bench(
             continue;
         }
         if let Some((_, group, _)) = pack.classify_with_rule(item) {
-            ext_groups.entry(item.ext.clone()).or_default().insert(group);
+            ext_groups
+                .entry(item.ext.clone())
+                .or_default()
+                .insert(group);
         }
     }
     // 只保留「一个扩展名只对应一个分组」的，其余本身不携带分类信息
@@ -1173,7 +1188,10 @@ fn bench(
         );
     }
     println!("    写不成规则：{manual} 条（快捷方式等，PecoFence 条件表达不了，只能手拖）");
-    println!("    成本 = {} 条规则 + {manual} 次拖拽 = {rule_ops} 次操作", rule_groups.len());
+    println!(
+        "    成本 = {} 条规则 + {manual} 次拖拽 = {rule_ops} 次操作",
+        rule_groups.len()
+    );
     println!("模型侧");
     println!("    准确率 {}%（{source}）", (ai_accuracy * 100.0).round());
     println!("    成本 = {ai_ops:.1} 次操作（1 次确认 + 每条判错/判不出的纠正）");
@@ -1186,7 +1204,10 @@ fn bench(
         // 反推：模型准确率掉到多少就不划算了
         let need = 1.0 - (threshold - 1.0) / n as f64;
         if need > 0.0 {
-            println!("临界点：模型准确率需高于 {}%，低于这个数就不如手写规则", (need * 100.0).round());
+            println!(
+                "临界点：模型准确率需高于 {}%，低于这个数就不如手写规则",
+                (need * 100.0).round()
+            );
         }
     }
     println!();
@@ -1263,18 +1284,11 @@ fn eval(
         match pack.classify(item) {
             Some((group, reason)) => {
                 n_classified += 1;
-                *confusion
-                    .entry((truth.clone(), group.clone()))
-                    .or_default() += 1;
+                *confusion.entry((truth.clone(), group.clone())).or_default() += 1;
                 if &group == truth {
                     n_correct += 1;
                 } else {
-                    errors.push((
-                        item.file_name.clone(),
-                        truth.clone(),
-                        group,
-                        reason,
-                    ));
+                    errors.push((item.file_name.clone(), truth.clone(), group, reason));
                 }
             }
             None => {
@@ -1497,11 +1511,7 @@ fn desktop_dir() -> PathBuf {
 }
 
 fn pct(n: usize, total: usize) -> usize {
-    if total == 0 {
-        0
-    } else {
-        n * 100 / total
-    }
+    (n * 100).checked_div(total).unwrap_or(0)
 }
 
 fn trunc(s: &str, max: usize) -> String {

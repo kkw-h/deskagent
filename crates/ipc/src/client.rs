@@ -192,9 +192,9 @@ fn pipe_name(instance: Option<&str>) -> Result<String, IpcError> {
 /// 是因为 client 属于 ipc crate，而 ipc 反过来依赖 platform 会把整个 windows-core
 /// 绑定拖进 CLI 的依赖图。两处都只是读 token，行为一致。
 fn current_user_sid() -> Result<String, IpcError> {
-    use windows_sys::Win32::Foundation::{CloseHandle, LocalFree, HANDLE};
+    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, LocalFree};
     use windows_sys::Win32::Security::Authorization::ConvertSidToStringSidW;
-    use windows_sys::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKEN_USER};
+    use windows_sys::Win32::Security::{GetTokenInformation, TOKEN_QUERY, TOKEN_USER, TokenUser};
     use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
     let sid_err = || IpcError::internal("cannot read the current user's SID");

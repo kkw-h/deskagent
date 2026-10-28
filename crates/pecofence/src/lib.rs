@@ -188,7 +188,12 @@ impl Cli {
     }
 
     /// 用完整条件加一条规则。
-    pub fn add_rule(&self, name: &str, to: &str, all_of: Vec<pecofence_core::rules::Cond>) -> Result<Value> {
+    pub fn add_rule(
+        &self,
+        name: &str,
+        to: &str,
+        all_of: Vec<pecofence_core::rules::Cond>,
+    ) -> Result<Value> {
         if all_of.is_empty() {
             return Err(Error::Usage("规则至少需要一个条件".into()));
         }
@@ -214,25 +219,20 @@ impl Cli {
             events: Some(vec!["item.added".to_string()]),
         };
         let mut captured: Option<Value> = None;
-        let finished = client::stream(
-            self.instance.as_deref(),
-            method,
-            self.timeout_ms,
-            |line| {
-                if !line.ok {
-                    return false;
-                }
-                let Some(result) = line.result else {
-                    return true;
-                };
-                // 订阅确认没有 event 字段，跳过
-                if result.get("event").and_then(|e| e.as_str()) == Some("item.added") {
-                    captured = Some(result);
-                    return false;
-                }
-                true
-            },
-        )?;
+        let finished = client::stream(self.instance.as_deref(), method, self.timeout_ms, |line| {
+            if !line.ok {
+                return false;
+            }
+            let Some(result) = line.result else {
+                return true;
+            };
+            // 订阅确认没有 event 字段，跳过
+            if result.get("event").and_then(|e| e.as_str()) == Some("item.added") {
+                captured = Some(result);
+                return false;
+            }
+            true
+        })?;
 
         match (finished, captured) {
             (_, Some(event)) => Ok(event),
@@ -245,9 +245,9 @@ impl Cli {
 /// 把 `{ok, result, warning}` 摊平成调用方要的 JSON。
 fn payload(resp: Response) -> Result<Value> {
     if !resp.ok {
-        let err = resp.error.unwrap_or_else(|| {
-            IpcError::internal("PecoFence 返回了失败状态但没有给出错误详情")
-        });
+        let err = resp
+            .error
+            .unwrap_or_else(|| IpcError::internal("PecoFence 返回了失败状态但没有给出错误详情"));
         return Err(err.into());
     }
     Ok(match (resp.result, resp.warning) {

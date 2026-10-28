@@ -104,11 +104,7 @@ pub fn compile_ext_rules(items: &[Item], pack: &RulePack) -> Compiled {
         let Some((group, _)) = pack.classify(item) else {
             continue;
         };
-        *tally
-            .entry(ext)
-            .or_default()
-            .entry(group)
-            .or_insert(0) += 1;
+        *tally.entry(ext).or_default().entry(group).or_insert(0) += 1;
     }
 
     let mut by_group: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -121,7 +117,10 @@ pub fn compile_ext_rules(items: &[Item], pack: &RulePack) -> Compiled {
         } else {
             let mut ranked: Vec<(String, usize)> = groups.into_iter().collect();
             ranked.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-            conflicts.push(Conflict { ext, groups: ranked });
+            conflicts.push(Conflict {
+                ext,
+                groups: ranked,
+            });
         }
     }
 
@@ -193,7 +192,7 @@ pub fn compile_conds(pack: &RulePack) -> CompiledConds {
 
     let mut rules: Vec<&deskagent_classify::Rule> = pack.rules.iter().collect();
     // 稳定排序：同优先级保持 yaml 里的先后顺序
-    rules.sort_by(|a, b| b.priority.cmp(&a.priority));
+    rules.sort_by_key(|a| std::cmp::Reverse(a.priority));
 
     for rule in rules {
         let m = &rule.r#match;
@@ -361,7 +360,11 @@ rules:
     fn shortcuts_never_become_ext_rules() {
         let items = vec![
             item("Steam", ".lnk", r"C:\Program Files (x86)\Steam\steam.exe"),
-            item("Chrome", ".lnk", r"C:\Program Files\Google\Chrome\chrome.exe"),
+            item(
+                "Chrome",
+                ".lnk",
+                r"C:\Program Files\Google\Chrome\chrome.exe",
+            ),
         ];
         let c = compile_ext_rules(&items, &pack());
         assert!(c.rules.is_empty());

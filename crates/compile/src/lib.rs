@@ -17,7 +17,15 @@ use deskagent_classify::{Item, RulePack};
 /// 分组优先级：决定栅栏的摆放顺序。
 /// 高频、视觉辨识度高的组放前面，工具类垫底。
 pub const GROUP_ORDER: [&str; 9] = [
-    "游戏", "浏览器", "开发", "社交", "影音", "办公", "创作", "工具", "系统",
+    "游戏",
+    "浏览器",
+    "开发",
+    "社交",
+    "影音",
+    "办公",
+    "创作",
+    "工具",
+    "系统",
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,17 +97,18 @@ pub fn build_with(
             Some((group, _reason)) => {
                 groups.entry(group).or_default().push(item.path.clone());
             }
-            None => {
-                match extra.iter().find(|(f, _)| *f == item.file_name) {
-                    Some((_, group)) => {
-                        groups.entry(group.clone()).or_default().push(item.path.clone());
-                    }
-                    None => skipped.push(Skipped {
-                        name: item.name.clone(),
-                        reason: "规则包未覆盖".into(),
-                    }),
+            None => match extra.iter().find(|(f, _)| *f == item.file_name) {
+                Some((_, group)) => {
+                    groups
+                        .entry(group.clone())
+                        .or_default()
+                        .push(item.path.clone());
                 }
-            }
+                None => skipped.push(Skipped {
+                    name: item.name.clone(),
+                    reason: "规则包未覆盖".into(),
+                }),
+            },
         }
     }
 
@@ -320,7 +329,12 @@ rules:
 
     #[test]
     fn layout_keeps_every_fence_inside_work_area() {
-        let area = Rect { x: 0, y: 0, w: 1920, h: 1000 };
+        let area = Rect {
+            x: 0,
+            y: 0,
+            w: 1920,
+            h: 1000,
+        };
         for n in 1..=12 {
             for r in layout(n, area) {
                 assert!(r.x >= area.x, "n={n} 越左边界");
@@ -333,7 +347,12 @@ rules:
 
     #[test]
     fn layout_never_overlaps() {
-        let area = Rect { x: 0, y: 0, w: 1920, h: 1000 };
+        let area = Rect {
+            x: 0,
+            y: 0,
+            w: 1920,
+            h: 1000,
+        };
         for n in 1..=12 {
             let rects = layout(n, area);
             assert_eq!(rects.len(), n);
@@ -353,7 +372,12 @@ rules:
     /// 七个栅栏是本机桌面的真实情况，纵向串排会到 2520px，必须分行。
     #[test]
     fn seven_fences_use_multiple_rows() {
-        let area = Rect { x: 0, y: 0, w: 1920, h: 1000 };
+        let area = Rect {
+            x: 0,
+            y: 0,
+            w: 1920,
+            h: 1000,
+        };
         let rects = layout(7, area);
         let first_row_y = rects[0].y;
         let rows = rects.iter().filter(|r| r.y == first_row_y).count();
@@ -363,7 +387,12 @@ rules:
     #[test]
     fn layout_respects_non_zero_origin() {
         // 副屏在左侧时 x 为负
-        let area = Rect { x: -1920, y: 0, w: 1920, h: 1000 };
+        let area = Rect {
+            x: -1920,
+            y: 0,
+            w: 1920,
+            h: 1000,
+        };
         let rects = layout(3, area);
         assert!(rects.iter().all(|r| r.x >= -1920));
         assert_eq!(rects[0].x, -1920 + MARGIN);
@@ -376,7 +405,12 @@ rules:
 
     #[test]
     fn rect_arg_matches_cli_format() {
-        let r = Rect { x: 100, y: 100, w: 480, h: 360 };
+        let r = Rect {
+            x: 100,
+            y: 100,
+            w: 480,
+            h: 360,
+        };
         assert_eq!(r.to_arg(), "100,100,480,360");
     }
 }

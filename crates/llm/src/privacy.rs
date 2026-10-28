@@ -38,10 +38,7 @@ pub fn sanitize_path(path: &str) -> String {
 
 /// URL 只保留主机名：`https://mail.qq.com/cgi-bin/x?sid=abc` → `mail.qq.com`。
 pub fn sanitize_url(url: &str) -> String {
-    let rest = url
-        .split_once("://")
-        .map(|(_, r)| r)
-        .unwrap_or(url);
+    let rest = url.split_once("://").map(|(_, r)| r).unwrap_or(url);
     rest.split(['/', '?', '#'])
         .next()
         .unwrap_or(rest)
@@ -60,14 +57,14 @@ pub struct RedactedItem {
 
 impl RedactedItem {
     pub fn from_item(item: &deskagent_classify::Item) -> Self {
-        let target_hint = if item.target.starts_with("http://") || item.target.starts_with("https://")
-        {
-            sanitize_url(&item.target)
-        } else if item.target.is_empty() {
-            String::new()
-        } else {
-            sanitize_path(&item.target)
-        };
+        let target_hint =
+            if item.target.starts_with("http://") || item.target.starts_with("https://") {
+                sanitize_url(&item.target)
+            } else if item.target.is_empty() {
+                String::new()
+            } else {
+                sanitize_path(&item.target)
+            };
         Self {
             name: item.name.clone(),
             ext: item.ext.clone(),
@@ -128,7 +125,10 @@ mod tests {
             sanitize_url("https://mail.qq.com/cgi-bin/x?sid=secret"),
             "mail.qq.com"
         );
-        assert_eq!(sanitize_url("http://support.steampowered.com/"), "support.steampowered.com");
+        assert_eq!(
+            sanitize_url("http://support.steampowered.com/"),
+            "support.steampowered.com"
+        );
     }
 
     #[test]

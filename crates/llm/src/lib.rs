@@ -192,7 +192,14 @@ impl Client {
             return Err(Error::Http(format!(
                 "curl 退出码 {:?}：{}",
                 out.status.code(),
-                truncate(if stderr.trim().is_empty() { &stdout } else { &stderr }, 300)
+                truncate(
+                    if stderr.trim().is_empty() {
+                        &stdout
+                    } else {
+                        &stderr
+                    },
+                    300
+                )
             )));
         }
 
@@ -204,7 +211,12 @@ impl Client {
             .and_then(|m| m.get("content"))
             .and_then(|c| c.as_str())
             .map(str::to_string)
-            .ok_or_else(|| Error::Decode(format!("缺少 choices[0].message.content: {}", truncate(&stdout, 200))))
+            .ok_or_else(|| {
+                Error::Decode(format!(
+                    "缺少 choices[0].message.content: {}",
+                    truncate(&stdout, 200)
+                ))
+            })
     }
 }
 

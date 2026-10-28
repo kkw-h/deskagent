@@ -135,8 +135,10 @@ fn read_string_data(b: &[u8], off: &mut usize, flags: u32, bit: u32) -> String {
         return String::new();
     }
     let chars: Vec<u16> = b[start..end]
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|c| u16::from_le_bytes(*c))
         .collect();
     String::from_utf16_lossy(&chars)
 }
@@ -164,8 +166,10 @@ fn read_wide(b: &[u8], off: usize) -> Option<String> {
         end += 2;
     }
     let chars: Vec<u16> = b[off..end]
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|c| u16::from_le_bytes(*c))
         .collect();
     Some(String::from_utf16_lossy(&chars))
 }
