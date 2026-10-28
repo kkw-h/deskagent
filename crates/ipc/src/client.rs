@@ -7,7 +7,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use pecofence_ipc::{ErrorCode, IpcError, Method, Request, Response};
+use crate::{ErrorCode, IpcError, Method, Request, Response};
 
 /// `SECURITY_IDENTIFICATION`: the server may learn who we are but cannot impersonate us. std's
 /// `security_qos_flags` ORs `SECURITY_SQOS_PRESENT` in by itself (so that the zero-valued
@@ -183,8 +183,79 @@ fn exchange(name: &str, line: &str) -> Result<Response, IpcError> {
 /// The pipe of the app running under this user's account, computed by the same function the
 /// app uses.
 fn pipe_name(instance: Option<&str>) -> Result<String, IpcError> {
-    pecofence_platform::pipe::ipc_pipe_name(instance)
-        .map_err(|e| IpcError::internal(format!("cannot read the current user's SID: {e}")))
+    Ok(crate::ipc_pipe_name(&current_user_sid()?, instance))
+}
+
+/// String SID (`S-1-5-21-…`) of the account this process runs as.
+///
+/// 这段逻辑与 `pecofence-platform::pipe::current_user_sid` 等价。之所以在这里再写一遍，
+/// 是因为 client 属于 ipc crate，而 ipc 反过来依赖 platform 会把整个 windows-core
+/// 绑定拖进 CLI 的依赖图。两处都只是读 token，行为一致。
+fn current_user_sid() -> Result<String, IpcError> {
+    use windows_sys::Win32::Foundation::{CloseHandle, LocalFree, HANDLE};
+    use windows_sys::Win32::Security::Authorization::ConvertSidToStringSidW;
+    use windows_sys::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKEN_USER};
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    let sid_err = || IpcError::internal("cannot read the current user's SID");
+
+    struct Token(HANDLE);
+    impl Drop for Token {
+        fn drop(&mut self) {
+            // SAFETY: we own the token handle.
+            unsafe { CloseHandle(self.0) };
+        }
+    }
+
+    let mut raw: HANDLE = std::ptr::null_mut();
+    // SAFETY: GetCurrentProcess is a pseudo handle; `raw` receives the token.
+    if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut raw) } == 0 {
+        return Err(sid_err());
+    }
+    let token = Token(raw);
+
+    let mut needed = 0u32;
+    // SAFETY: a size query; failing with ERROR_INSUFFICIENT_BUFFER is the expected outcome.
+    unsafe {
+        GetTokenInformation(token.0, TokenUser, std::ptr::null_mut(), 0, &mut needed);
+    }
+    if needed == 0 {
+        return Err(sid_err());
+    }
+
+    let mut buffer = vec![0u8; needed as usize];
+    // SAFETY: the buffer is `needed` bytes, as the previous call requested.
+    if unsafe {
+        GetTokenInformation(
+            token.0,
+            TokenUser,
+            buffer.as_mut_ptr().cast(),
+            needed,
+            &mut needed,
+        )
+    } == 0
+    {
+        return Err(sid_err());
+    }
+
+    // SAFETY: the call above filled the buffer with a TOKEN_USER whose Sid points inside it.
+    let sid = unsafe { (*buffer.as_ptr().cast::<TOKEN_USER>()).User.Sid };
+    let mut text: *mut u16 = std::ptr::null_mut();
+    // SAFETY: `sid` points into `buffer`, which is alive; `text` receives a LocalAlloc string.
+    if unsafe { ConvertSidToStringSidW(sid, &mut text) } == 0 {
+        return Err(sid_err());
+    }
+    // SAFETY: `text` is a NUL-terminated string we must LocalFree.
+    let out = unsafe {
+        let mut len = 0usize;
+        while *text.add(len) != 0 {
+            len += 1;
+        }
+        let s = String::from_utf16_lossy(std::slice::from_raw_parts(text, len));
+        LocalFree(text.cast());
+        s
+    };
+    Ok(out)
 }
 
 fn closed() -> IpcError {

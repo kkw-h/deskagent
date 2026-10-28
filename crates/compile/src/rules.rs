@@ -1,22 +1,37 @@
 //! 规则编译：把分类结果里**能用 PecoFence 条件表达**的部分沉淀成持久规则。
 //!
-//! 这是整个产品里唯一「一次投入、长期免维护」的部分，所以判定要保守：
-//! 只编译扩展名规则，且只在「一个扩展名只对应一个分组」时才编译。
+//! 这里有两套产出，用途不同：
 //!
-//! 为什么只做扩展名：
-//!   - PecoFence 的条件是 `--ext` / `--type` / `--name-contains` / `--glob` 等**文件属性**，
-//!     没有公司名，也没有快捷方式目标路径。
-//!   - 我们分类时最强的那两个信号（target_contains、company）恰好无法表达成规则。
-//!   - `--name-contains` 可以表达一部分，但自动生成的子串规则误伤率太高
-//!     （比如给「游戏」生成 `--name-contains 游戏`，会把「游戏加加」这种工具也吸进去），
-//!     所以不自动生成，留给用户手写。
+//! - [`compile_ext_rules`]：给 `rule add --ext` 用的简化形式，只按扩展名分组。
+//!   判定保守：一个扩展名只对应一个分组时才编译。
+//! - [`compile_conds`]：给 `rules.add` 用的完整条件表达式，能把快捷方式也表达出来。
 //!
-//! 推论：扩展名能覆盖的部分可以做到「新文件自动归位」，零维护；
-//! 快捷方式那部分必须靠 `deskagent watch` 常驻守护。
+//! ## 四种分类信号在 PecoFence 里的可表达性（对源码核对过，别再凭印象）
+//!
+//! | 信号 | PecoFence 条件 | 可表达 |
+//! |---|---|---|
+//! | `ext` | `Cond::Ext` | 是 |
+//! | `name_contains` | `Cond::Name { op: Contains }` | 是 |
+//! | `target_contains` | `Cond::ShortcutTarget { op: Contains }` | 是 |
+//! | `company` | 无对应条件 | **否** |
+//!
+//! 早先这里写着「没有快捷方式目标路径」，那是错的：`Cond::ShortcutTarget` 一直存在，
+//! 而且 `Rule::new` 会把它归进最高优先级的 `Class::Target`。所以快捷方式并非写不成规则，
+//! 只是要为每个产品写一条，人工成本高。
+//!
+//! 真正表达不了的只有 `company`。PE 版本信息里的公司名是 DeskAgent 独有的信号
+//! （PecoFence 的 `ItemFacts` 里没有这个字段），这一部分只能靠常驻守护补。
+//!
+//! ## 为什么 `name_contains` 仍然不自动生成
+//!
+//! 子串规则的误伤率太高：给「游戏」生成 `Name contains 游戏`，
+//! 会把「游戏加加」这种工具也吸进去。所以 `compile_conds` 会产出它，
+//! 但由调用方决定要不要用，不默认落地。
 
 use std::collections::BTreeMap;
 
 use deskagent_classify::{Item, RulePack};
+use pecofence_core::rules::{Cond, StrOp};
 
 /// 快捷方式类扩展名。归属靠语义判断，用扩展名规则只会把所有快捷方式
 /// 塞进同一个栅栏，所以不参与编译。
@@ -129,6 +144,117 @@ pub fn compile_ext_rules(items: &[Item], pack: &RulePack) -> Compiled {
         conflicts,
         skipped_semantic,
     }
+}
+
+/// 一条单条件规则，可以交给 `rules.add`。
+///
+/// 为什么是「单条件」：规则包里一条规则的多个候选值之间是 **OR**
+/// （`company: [A, B]` 表示命中 A 或 B 就算），而 PecoFence 的 `Rule.all_of`
+/// 是 **AND**。语义不同，所以一条 YAML 规则要拆成多条 PecoFence 规则。
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompiledRule {
+    pub group: String,
+    pub cond: Cond,
+    /// 人可读的来源描述，用于展示、去重和排查。
+    pub source: String,
+    /// 原规则包里的优先级，越大越先匹配。
+    pub priority: i32,
+}
+
+/// 分类用到了、但 PecoFence 条件表达不了的信号。
+#[derive(Debug, Clone, PartialEq)]
+pub struct Unrepresentable {
+    pub group: String,
+    /// 目前只有 `"company"`：PE 版本信息里的公司名，`ItemFacts` 没有这个字段。
+    pub kind: &'static str,
+    pub values: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CompiledConds {
+    pub rules: Vec<CompiledRule>,
+    pub unrepresentable: Vec<Unrepresentable>,
+}
+
+/// 把规则包编译成 PecoFence 原生的 `Cond`。
+///
+/// 与 [`compile_ext_rules`] 的区别：那个只按扩展名分组，产出给 `rule add --ext`；
+/// 这个逐条映射，能把 `target_contains` 也表达出来，产出给 `rules.add`。
+///
+/// 优先级语义并不完全对齐，这是必须知道的一处差异：
+///   - DeskAgent 用数值 priority，大的先匹配；
+///   - PecoFence 先按 `Class` 排序（Target > Type > Name > Time > Custom），
+///     再按列表顺序。
+///
+/// 所以这里按 priority 降序输出，但落地后 PecoFence 仍会把 Target 类提到最前。
+/// 对当前规则包没有实际影响（各分组之间没有重叠的匹配条件），
+/// 但如果以后加了「同一产品在两组之间竞争」的规则，就要重新核对。
+pub fn compile_conds(pack: &RulePack) -> CompiledConds {
+    let mut out = CompiledConds::default();
+
+    let mut rules: Vec<&deskagent_classify::Rule> = pack.rules.iter().collect();
+    // 稳定排序：同优先级保持 yaml 里的先后顺序
+    rules.sort_by(|a, b| b.priority.cmp(&a.priority));
+
+    for rule in rules {
+        let m = &rule.r#match;
+
+        // 同一组内的多个扩展名是「或」，但 Cond::Ext 本身就接受列表，合并成一条即可。
+        let exts: Vec<String> = m
+            .ext
+            .iter()
+            .map(|e| e.trim_start_matches('.').to_lowercase())
+            .filter(|e| !e.is_empty())
+            .collect();
+        if !exts.is_empty() {
+            out.rules.push(CompiledRule {
+                group: rule.group.clone(),
+                cond: Cond::Ext(exts.clone()),
+                source: format!("扩展名 {}", exts.join(",")),
+                priority: rule.priority,
+            });
+        }
+
+        for t in m.target_contains.iter().filter(|t| !t.is_empty()) {
+            out.rules.push(CompiledRule {
+                group: rule.group.clone(),
+                cond: Cond::ShortcutTarget {
+                    op: StrOp::Contains,
+                    value: t.to_lowercase(),
+                },
+                source: format!("目标路径含 {t}"),
+                priority: rule.priority,
+            });
+        }
+
+        for n in m.name_contains.iter().filter(|n| !n.is_empty()) {
+            out.rules.push(CompiledRule {
+                group: rule.group.clone(),
+                cond: Cond::Name {
+                    op: StrOp::Contains,
+                    value: n.to_lowercase(),
+                },
+                source: format!("文件名含 {n}"),
+                priority: rule.priority,
+            });
+        }
+
+        let companies: Vec<String> = m
+            .company
+            .iter()
+            .filter(|c| !c.is_empty())
+            .cloned()
+            .collect();
+        if !companies.is_empty() {
+            out.unrepresentable.push(Unrepresentable {
+                group: rule.group.clone(),
+                kind: "company",
+                values: companies,
+            });
+        }
+    }
+
+    out
 }
 
 /// 从 `rule list` 的返回值里取出已有的规则名。
@@ -303,5 +429,100 @@ rules:
         let v = serde_json::json!([{"title": "游戏"}]);
         assert!(existing_rule_names(&v).is_empty());
         assert!(!keep_updated(&v));
+    }
+
+    // ---------------------------------------------------- 完整条件编译
+
+    /// 快捷方式目标路径**可以**表达成 PecoFence 条件。早先这里判断错了，
+    /// 用测试钉住：Cond::ShortcutTarget 一直存在，且是最高的 Target 类。
+    #[test]
+    fn target_contains_becomes_shortcut_target_cond() {
+        let p = RulePack::from_yaml(
+            r#"
+rules:
+  - group: 游戏
+    priority: 130
+    match:
+      target_contains: ['\steam\', '\epicgames\']
+"#,
+        )
+        .unwrap();
+        let c = compile_conds(&p);
+        assert_eq!(c.rules.len(), 2, "两个候选值要拆成两条（OR → 多条 AND）");
+        assert_eq!(
+            c.rules[0].cond,
+            Cond::ShortcutTarget {
+                op: StrOp::Contains,
+                value: r"\steam\".into()
+            }
+        );
+        assert!(c.unrepresentable.is_empty());
+    }
+
+    /// 公司名没有对应的 Cond，必须如实报出来，不能悄悄丢掉。
+    #[test]
+    fn company_is_reported_as_unrepresentable() {
+        let p = RulePack::from_yaml(
+            r#"
+rules:
+  - group: 开发
+    priority: 120
+    match:
+      company: ['JetBrains', 'Zed Industries']
+      target_contains: ['\jetbrains\']
+"#,
+        )
+        .unwrap();
+        let c = compile_conds(&p);
+        // target_contains 那一半能表达
+        assert_eq!(c.rules.len(), 1);
+        assert_eq!(c.rules[0].group, "开发");
+        // company 那一半表达不了，但要被记录
+        assert_eq!(c.unrepresentable.len(), 1);
+        assert_eq!(c.unrepresentable[0].kind, "company");
+        assert_eq!(c.unrepresentable[0].values.len(), 2);
+    }
+
+    /// 同一规则的多个扩展名合并成一条 Cond::Ext，避免规则表膨胀。
+    #[test]
+    fn exts_merge_into_one_cond() {
+        let p = RulePack::from_yaml(
+            r#"
+rules:
+  - group: 办公
+    priority: 110
+    match:
+      ext: ['.pdf', '.docx', '.xlsx']
+"#,
+        )
+        .unwrap();
+        let c = compile_conds(&p);
+        assert_eq!(c.rules.len(), 1);
+        assert_eq!(
+            c.rules[0].cond,
+            Cond::Ext(vec!["pdf".into(), "docx".into(), "xlsx".into()])
+        );
+    }
+
+    /// 输出按 priority 降序，与分类时的匹配顺序一致。
+    #[test]
+    fn conds_follow_priority_order() {
+        let p = RulePack::from_yaml(
+            r#"
+rules:
+  - group: 办公
+    priority: 100
+    match:
+      ext: ['.pdf']
+  - group: 游戏
+    priority: 130
+    match:
+      target_contains: ['\steam\']
+"#,
+        )
+        .unwrap();
+        let c = compile_conds(&p);
+        let groups: Vec<&str> = c.rules.iter().map(|r| r.group.as_str()).collect();
+        assert_eq!(groups, vec!["游戏", "办公"]);
     }
 }

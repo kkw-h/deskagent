@@ -8,6 +8,10 @@
 //! Compatibility: [`PROTOCOL_VERSION`] is bumped whenever a method's params or a DTO changes in
 //! a way an older peer would misread; the server answers `version_mismatch` for anything else.
 
+// 客户端只在 Windows 下编译：它直接用 std::os::windows 的命名管道与 kernel32。
+// 协议本身（dto / Method / 请求响应）保持跨平台，core 与 ipc 的单元测试可以在任何平台跑。
+#[cfg(windows)]
+pub mod client;
 pub mod dto;
 #[cfg(feature = "describe")]
 pub mod schema;

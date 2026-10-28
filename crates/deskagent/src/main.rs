@@ -570,14 +570,9 @@ fn apply(
         return Ok(());
     }
 
-    let cli = cli.ok_or(pecofence::Error::NotFound)?;
-    println!("\npecofence-cli: {}", cli.path().display());
-
-    // 先确认应用在运行，否则后面每一步都会失败
-    cli.status().map_err(|e| match e {
-        pecofence::Error::NotRunning => anyhow::anyhow!("PecoFence 没有在运行，请先启动它"),
-        other => anyhow::anyhow!(other),
-    })?;
+    // discover() 内部已经用 status 探过一次，这里不必再探
+    let cli = cli.ok_or(pecofence::Error::NotRunning)?;
+    println!("\n已连接 PecoFence");
 
     // 有副作用前先存快照，出问题能回滚布局
     let stamp = timestamp();

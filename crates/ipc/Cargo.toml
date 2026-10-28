@@ -12,6 +12,17 @@ serde_json = { workspace = true }
 uuid = { workspace = true }
 schemars = { workspace = true, optional = true }
 
+# client 模块要读当前用户 SID 才能算出管道名。用 windows-sys 而不是
+# pecofence-platform：ipc 是 CLI 和应用都依赖的轻量协议层，
+# 把整个 platform（windows-core + 完整 bindgen 绑定）拖进来不划算。
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_Threading",
+] }
+
 [features]
 # JSON Schema export for `pecofence-cli describe`; the app never enables it.
 describe = ["dep:schemars", "pecofence-core/schema"]

@@ -13,7 +13,8 @@ use crate::cli::{
     SettingsCmd, SnapshotCmd,
 };
 use crate::output::{Reply, Style};
-use crate::{client, describe, local, output};
+
+use crate::{describe, local, output};
 
 const SET_USAGE: &str =
     "Usage: pecofence-cli fence set <FENCE> <PROP> <VALUE>  |  fence set --all <PROP> <VALUE>";
@@ -31,7 +32,7 @@ pub struct Ctx {
 
 impl Ctx {
     fn send(&self, method: Method) -> Result<Response, IpcError> {
-        client::send(self.instance.as_deref(), method, self.timeout_ms)
+        pecofence_ipc::client::send(self.instance.as_deref(), method, self.timeout_ms)
     }
 
     fn call(&self, method: Method) -> Result<Reply, IpcError> {
@@ -166,7 +167,7 @@ fn watch(
     };
     let mut first: Option<Reply> = None;
     let style = &ctx.style;
-    let finished = client::stream(ctx.instance.as_deref(), method, ctx.timeout_ms, |line| {
+    let finished = pecofence_ipc::client::stream(ctx.instance.as_deref(), method, ctx.timeout_ms, |line| {
         let reply = match reply_from(line) {
             Ok(reply) => reply,
             Err(error) => Reply::new(output::error_payload(&error)),

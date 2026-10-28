@@ -179,6 +179,7 @@ name = "deskagent-compile"
 version = "0.2.3"
 dependencies = [
  "deskagent-classify",
+ "pecofence-core",
  "serde",
  "serde_json",
 ]
@@ -197,6 +198,8 @@ dependencies = [
 name = "deskagent-pecofence"
 version = "0.2.3"
 dependencies = [
+ "pecofence-core",
+ "pecofence-ipc",
  "serde_json",
  "thiserror",
 ]
@@ -438,6 +441,7 @@ dependencies = [
  "serde",
  "serde_json",
  "uuid",
+ "windows-sys",
 ]
 
 [[package]]

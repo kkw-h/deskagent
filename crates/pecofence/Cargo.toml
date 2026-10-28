@@ -5,7 +5,13 @@ version.workspace = true
 # 这些 crate 是 deskagent 原有代码，升 edition 需要单独验证。
 edition = "2021"
 license.workspace = true
+description = "deskagent 与 PecoFence 之间的调用层：直接走命名管道，不启动子进程。"
 
 [dependencies]
+# 合并前这里是「起 pecofence-cli 子进程、拼命令行参数、解析 stdout」。
+# 现在直接复用 pecofence-cli 自己用的那套 IPC 客户端。
+pecofence-ipc = { path = "../ipc" }
+# 规则条件用 PecoFence 的原生类型（Cond / RuleSet），不再拼 JSON。
+pecofence-core = { path = "../core" }
 thiserror.workspace = true
 serde_json.workspace = true

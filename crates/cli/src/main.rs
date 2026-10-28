@@ -4,7 +4,6 @@
 //! 0 ok, 1 the app returned an error, 2 usage, 3 not running, 4 timeout.
 
 mod cli;
-mod client;
 mod describe;
 mod local;
 mod output;

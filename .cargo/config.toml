@@ -1,4 +1,11 @@
-# 项目路径含空格与中文，GNU ld 无法正确解析 target 下的中间产物路径，
-# 因此把构建产物放到纯 ASCII 路径。
 [build]
+# 显式固定 MSVC target。
+# 本机 rustc 是 GNU host（x86_64-pc-windows-gnu），不指定 target 时 cargo 默认用 host，
+# 而 PecoFence 依赖的 windows crate 在 GNU 下需要 dlltool 生成 import lib ——
+# rustup 的 rust-mingw 组件不提供 dlltool，`cargo check` 能过但 `cargo test` / `cargo build`
+# 会在链接阶段失败。固定成 msvc 后与 PecoFence 上游的构建方式一致。
+target = "x86_64-pc-windows-msvc"
+
+# 项目路径含空格与中文，链接器对中间产物路径的处理容易出问题，
+# 因此把构建产物放到纯 ASCII 路径。
 target-dir = "C:/Users/kkw/cargo-target/deskagent"
