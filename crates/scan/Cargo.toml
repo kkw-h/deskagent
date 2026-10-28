@@ -1,0 +1,10 @@
+[package]
+name = "deskagent-scan"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+encoding_rs.workspace = true
+pelite.workspace = true

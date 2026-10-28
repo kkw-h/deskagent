@@ -1,0 +1,15 @@
+# 统一换行符，避免 Windows 上 Git 反复提示 LF→CRLF
+* text=auto eol=lf
+
+*.rs    text eol=lf
+*.toml  text eol=lf
+*.md    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.json  text eol=lf
+*.py    text eol=lf
+*.html  text eol=lf
+
+*.png   binary
+*.ico   binary
+*.exe   binary

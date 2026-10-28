@@ -1,0 +1,238 @@
+# DeskAgent 内置分类规则包
+#
+# 匹配顺序：priority 从高到低，命中即停。
+# target_contains 比 company 精确（同一家公司可能出多种软件），所以优先级更高。
+# company / target_contains / name_contains 均为不区分大小写的子串匹配。
+
+rules:
+  # ============ 游戏 ============
+  - group: 游戏
+    priority: 130
+    match:
+      target_contains:
+        - '\steam\'
+        - '\steamtools\'
+        - '\wegame\'
+        - '\wegameapps\'
+        - '\epic games\'
+        - '\gameviewer\'
+        - '\battle.net\'
+        - '\riot games\'
+        - '\ubisoft\'
+        - '\electronic arts\'
+        - '\gog galaxy\'
+
+  - group: 游戏
+    priority: 120
+    match:
+      company:
+        - 'Valve'
+        - 'Epic Games'
+        - 'Blizzard'
+        - 'Riot Games'
+        - 'Ubisoft'
+        - 'Electronic Arts'
+        - 'Game Plus Plus'
+
+  - group: 游戏
+    priority: 100
+    match:
+      name_contains:
+        - '英雄联盟'
+        - '原神'
+        - '崩坏'
+        - '我的世界'
+        - '双点'
+
+  # ============ 浏览器 ============
+  - group: 浏览器
+    priority: 130
+    match:
+      target_contains:
+        - '\google\chrome\'
+        - '\microsoft\edge\'
+        - '\mozilla firefox\'
+        - '\bravesoftware\'
+        - '\quark\'
+
+  - group: 浏览器
+    priority: 110
+    match:
+      company:
+        - 'Mozilla'
+
+  # ============ 开发 ============
+  - group: 开发
+    priority: 130
+    match:
+      target_contains:
+        - '\zed\'
+        - '\yaak\'
+        - '\jetbrains\'
+        - '\microsoft vs code\'
+        - '\visual studio\'
+        - '\vmware\'
+        - '\virtualbox\'
+        - '\git\'
+        - '\nodejs\'
+        - '\python\'
+        - '\wechatwebdevtools\'
+        - '微信web开发者工具'
+        - '\workbuddy'
+        - '\docker\'
+
+  - group: 开发
+    priority: 120
+    match:
+      company:
+        - 'Zed Industries'
+        - 'JetBrains'
+        - 'VMware'
+        - 'GitHub'
+        - 'Postman'
+
+  - group: 开发
+    priority: 100
+    match:
+      name_contains:
+        - '开发者工具'
+        - 'developer'
+
+  # ============ 社交 ============
+  - group: 社交
+    priority: 130
+    match:
+      target_contains:
+        - '\weixin\'
+        - '\wechat\'
+        - '\qqnt\'
+        - '\telegram desktop\'
+        - '\discord\'
+        - '\slack\'
+
+  - group: 社交
+    priority: 120
+    match:
+      company:
+        - 'Telegram'
+        - 'Discord'
+
+  # ============ 影音 ============
+  - group: 影音
+    priority: 130
+    match:
+      target_contains:
+        - '\potplayer\'
+        - '\cloudmusic\'
+        - '\bilibili\'
+        - '\vlc\'
+        - '\spotify\'
+        - '\iqiyi\'
+        - '\youku\'
+
+  - group: 影音
+    priority: 120
+    match:
+      company:
+        - 'Kakao'
+        - 'VideoLAN'
+        - 'Spotify'
+
+  - group: 影音
+    priority: 100
+    match:
+      name_contains:
+        - '音乐'
+        - '播放器'
+        - '视频'
+
+  # ============ 办公 ============
+  - group: 办公
+    priority: 130
+    match:
+      target_contains:
+        - '\kingsoft\'
+        - '\wps office\'
+        - '\microsoft office\'
+        - '\feishu\'
+        - '\doubao\'
+        - '\dingtalk\'
+        - '\notion\'
+        - '\obsidian\'
+
+  - group: 办公
+    priority: 120
+    match:
+      company:
+        - 'Kingsoft'
+        - 'Feishu'
+        - 'Beijing Chuntian Zhiyun'
+        - 'Notion Labs'
+
+  - group: 办公
+    priority: 110
+    match:
+      ext:
+        - '.doc'
+        - '.docx'
+        - '.xls'
+        - '.xlsx'
+        - '.ppt'
+        - '.pptx'
+        - '.pdf'
+
+  # ============ 创作 ============
+  - group: 创作
+    priority: 130
+    match:
+      target_contains:
+        - '\obs-studio\'
+        - '\adobe\'
+        - '\figma\'
+        - '\blender\'
+        - '\davinci resolve\'
+
+  - group: 创作
+    priority: 110
+    match:
+      ext:
+        - '.psd'
+        - '.ai'
+        - '.sketch'
+        - '.fig'
+        - '.blend'
+        - '.prproj'
+
+  # ============ 工具 ============
+  - group: 工具
+    priority: 130
+    match:
+      target_contains:
+        - '\clash'
+        - '\todesk\'
+        - '\quicklook\'
+        - '\nvidia'
+        - '\leigod'
+        - '\sciland\'
+        - '\pccontinuity\'
+        - '\7-zip\'
+        - '\winrar\'
+        - '\everything\'
+
+  - group: 工具
+    priority: 120
+    match:
+      company:
+        - 'NVIDIA'
+        - 'Clash Verge'
+        - 'pooi.moe'
+        - 'Sciland'
+        - 'MiPcContinuity'
+
+  - group: 工具
+    priority: 100
+    match:
+      name_contains:
+        - '加速器'
+        - '远程'
+        - '助手'

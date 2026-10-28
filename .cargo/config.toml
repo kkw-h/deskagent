@@ -1,0 +1,4 @@
+# 项目路径含空格与中文，GNU ld 无法正确解析 target 下的中间产物路径，
+# 因此把构建产物放到纯 ASCII 路径。
+[build]
+target-dir = "C:/Users/kkw/cargo-target/deskagent"

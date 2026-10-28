@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/scan",
+    "crates/classify",
+    "crates/cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Han Di"]
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+encoding_rs = "0.8"
+tracing = "0.1"
+pelite = "0.10"
+
+# 关掉 color 特性，避免引入 anstyle-wincon → windows-sys
+# 后者在 GNU 工具链下需要 dlltool，而 rustup 的 rust-mingw 组件不提供
+clap = { version = "4", default-features = false, features = [
+    "std",
+    "derive",
+    "help",
+    "usage",
+    "error-context",
+] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
