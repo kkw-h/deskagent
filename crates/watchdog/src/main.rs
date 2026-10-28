@@ -27,7 +27,16 @@ fn main() {
     // so keep trying for a while; if it never works the marker stays, and the next start adopts
     // the hidden icons and restores them at exit. A PecoFence started meanwhile takes them
     // over: the icons and the marker are its own then.
-    let instance = pecofence_core::brand::var("PECOFENCE_INSTANCE").ok();
+    //
+    // The instance name arrives as an argument: with the watchdog parented to Explorer its
+    // environment is not necessarily the app's, and the marker path only names the file.
+    let instance = args
+        .get(2)
+        .map(String::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .or_else(|| pecofence_core::brand::var("PECOFENCE_INSTANCE").ok());
     let [mutex, _] = pecofence_core::brand::instance_mutex_names(instance.as_deref());
     std::thread::sleep(std::time::Duration::from_millis(300));
     for attempt in 0..10 {

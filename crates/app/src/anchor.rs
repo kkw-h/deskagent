@@ -1059,7 +1059,16 @@ impl DesktopAnchor {
         }
         let pid = pecofence_platform::process::current_pid().to_string();
         let marker = self.icons.marker.to_string_lossy().to_string();
-        match pecofence_platform::process::spawn_detached(&wd.to_string_lossy(), &[&pid, &marker]) {
+        // The instance too: the watchdog may be parented to Explorer, where the environment is
+        // not ours.
+        let instance = pecofence_core::brand::var("PECOFENCE_INSTANCE").unwrap_or_default();
+        // Outside our job object and under Explorer: a launcher that kills the app's job or its
+        // process tree (a debugger, a test harness, an updater) must not take the watchdog with
+        // it, or the icons stay hidden.
+        match pecofence_platform::process::spawn_detached_outside_job(
+            &wd.to_string_lossy(),
+            &[&pid, &marker, &instance],
+        ) {
             Ok(wpid) => {
                 tracing::info!(watchdog_pid = wpid, "watchdog started");
                 self.icons.watchdogs.push(wpid);

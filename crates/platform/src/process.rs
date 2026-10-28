@@ -6,6 +6,10 @@ use windows_core::{Error, PCWSTR, PWSTR, Result};
 
 const SYNCHRONIZE: u32 = 0x0010_0000;
 
+/// `CreateProcessW` flag: the new process is not put into the job object of its creator. Not in
+/// the generated bindings; the value is from `winbase.h`.
+const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
+
 /// Blocks until the process with `pid` exits. Returns immediately if it cannot be opened.
 pub fn wait_for_process_exit(pid: u32) {
     // SAFETY: plain FFI calls; the handle is closed afterwards.
@@ -161,6 +165,41 @@ pub fn register_restart_after_update() -> Result<()> {
 
 /// Starts `exe` with `args` as a detached process (no console window). Returns its pid.
 pub fn spawn_detached(exe: &str, args: &[&str]) -> Result<u32> {
+    spawn_detached_with(exe, args, 0, None)
+}
+
+/// [`spawn_detached`], but the child is not part of the caller's job object or process tree.
+///
+/// A crash watchdog that dies together with the app it watches is useless: the app is gone, the
+/// marker still says the desktop icons are hidden, and nobody restores them. Two things make a
+/// kill of the app's job miss the watchdog:
+///
+/// - `CREATE_BREAKAWAY_FROM_JOB`, so a job with `KILL_ON_JOB_CLOSE` does not take it down
+///   (Windows refuses breakaway when the job does not allow it, hence the fallbacks);
+/// - `PROC_THREAD_ATTRIBUTE_PARENT_PROCESS` pointing at Explorer, so tools that kill a *process
+///   tree* (`taskkill /T`, a debugger, a CI runner) do not find it under us either.
+///
+/// Falls back to an Explorer parenthand over a plain detached spawn and finally the plain one,
+/// so a restricted token still leaves a watchdog for the ordinary crash case.
+pub fn spawn_detached_outside_job(exe: &str, args: &[&str]) -> Result<u32> {
+    let explorer = crate::desktop::window_pid(crate::desktop::shell_window());
+    let parent = (explorer != 0).then_some(explorer);
+    let mut last: Option<Error> = None;
+    for (flags, parent) in [(CREATE_BREAKAWAY_FROM_JOB, parent), (0, parent), (0, None)] {
+        match spawn_detached_with(exe, args, flags, parent) {
+            Ok(pid) => return Ok(pid),
+            Err(e) => last = Some(e),
+        }
+    }
+    Err(last.unwrap_or_else(Error::from_thread))
+}
+
+fn spawn_detached_with(
+    exe: &str,
+    args: &[&str],
+    extra_flags: u32,
+    parent: Option<u32>,
+) -> Result<u32> {
     let mut cmd = format!("\"{exe}\"");
     for a in args {
         cmd.push(' ');
@@ -175,25 +214,128 @@ pub fn spawn_detached(exe: &str, args: &[&str]) -> Result<u32> {
         ..Default::default()
     };
     let mut pi = PROCESS_INFORMATION::default();
-    // SAFETY: buffers outlive the call; handles are closed afterwards.
+    let flags = CREATE_NO_WINDOW as u32 | extra_flags;
+    let Some(parent) = parent else {
+        // SAFETY: buffers outlive the call; handles are closed afterwards.
+        unsafe {
+            let ok = CreateProcessW(
+                PCWSTR(exe_w.as_ptr()),
+                Some(PWSTR(cmd_w.as_mut_ptr())),
+                None,
+                None,
+                false,
+                flags,
+                None,
+                PCWSTR::null(),
+                &si,
+                &mut pi,
+            );
+            if !ok.as_bool() {
+                return Err(Error::from_thread());
+            }
+            let _ = CloseHandle(pi.hThread);
+            let _ = CloseHandle(pi.hProcess);
+            return Ok(pi.dwProcessId);
+        }
+    };
+    spawn_under(parent, &exe_w, &mut cmd_w, flags, &si, &mut pi)
+}
+
+/// `CreateProcessW` with `PROC_THREAD_ATTRIBUTE_PARENT_PROCESS` set to `parent`, so the child is
+/// not part of our process tree. The attribute list has to be built around the call.
+fn spawn_under(
+    parent: u32,
+    exe_w: &[u16],
+    cmd_w: &mut Vec<u16>,
+    flags: u32,
+    plain: &STARTUPINFOW,
+    pi: &mut PROCESS_INFORMATION,
+) -> Result<u32> {
+    // SAFETY: the buffers outlive every call below; the attribute list is freed before return.
     unsafe {
-        let ok = CreateProcessW(
-            PCWSTR(exe_w.as_ptr()),
-            Some(PWSTR(cmd_w.as_mut_ptr())),
-            None,
-            None,
-            false,
-            CREATE_NO_WINDOW as u32,
-            None,
-            PCWSTR::null(),
-            &si,
-            &mut pi,
-        );
-        if !ok.as_bool() {
+        windows_core::link!("kernel32.dll" "system" fn InitializeProcThreadAttributeList(list: *mut core::ffi::c_void, count: u32, flags: u32, size: *mut usize) -> windows_core::BOOL);
+        windows_core::link!("kernel32.dll" "system" fn UpdateProcThreadAttribute(list: *mut core::ffi::c_void, flags: u32, attribute: usize, value: *const core::ffi::c_void, size: usize, previous: *mut core::ffi::c_void, returned: *mut usize) -> windows_core::BOOL);
+        windows_core::link!("kernel32.dll" "system" fn DeleteProcThreadAttributeList(list: *mut core::ffi::c_void));
+        const PROC_THREAD_ATTRIBUTE_PARENT_PROCESS: usize = 0x0002_0000;
+        const PROCESS_CREATE_PROCESS: u32 = 0x0080;
+        const EXTENDED_STARTUPINFO_PRESENT: u32 = 0x0008_0000;
+
+        let process = OpenProcess(PROCESS_CREATE_PROCESS, false, parent);
+        if process.0.is_null() {
             return Err(Error::from_thread());
         }
-        let _ = CloseHandle(pi.hThread);
-        let _ = CloseHandle(pi.hProcess);
-        Ok(pi.dwProcessId)
+        let mut size = 0usize;
+        let _ = InitializeProcThreadAttributeList(std::ptr::null_mut(), 1, 0, &mut size);
+        let mut buffer = vec![0u8; size];
+        let list = buffer.as_mut_ptr() as *mut core::ffi::c_void;
+        let mut result = Err(Error::from_thread());
+        if size > 0 && InitializeProcThreadAttributeList(list, 1, 0, &mut size).as_bool() {
+            let updated = UpdateProcThreadAttribute(
+                list,
+                0,
+                PROC_THREAD_ATTRIBUTE_PARENT_PROCESS,
+                &process as *const HANDLE as *const core::ffi::c_void,
+                size_of::<HANDLE>(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+            .as_bool();
+            if updated {
+                let si = StartupInfoEx {
+                    info: STARTUPINFOW {
+                        cb: size_of::<StartupInfoEx>() as u32,
+                        ..*plain
+                    },
+                    attributes: list,
+                };
+                let ok = CreateProcessW(
+                    PCWSTR(exe_w.as_ptr()),
+                    Some(PWSTR(cmd_w.as_mut_ptr())),
+                    None,
+                    None,
+                    false,
+                    flags | EXTENDED_STARTUPINFO_PRESENT,
+                    None,
+                    PCWSTR::null(),
+                    &si.info,
+                    pi,
+                );
+                result = if ok.as_bool() {
+                    let _ = CloseHandle(pi.hThread);
+                    let _ = CloseHandle(pi.hProcess);
+                    Ok(pi.dwProcessId)
+                } else {
+                    Err(Error::from_thread())
+                };
+            }
+            DeleteProcThreadAttributeList(list);
+        }
+        let _ = CloseHandle(process);
+        result
+    }
+}
+
+/// `STARTUPINFOEXW`: `STARTUPINFOW` followed by the attribute list pointer.
+#[repr(C)]
+struct StartupInfoEx {
+    info: STARTUPINFOW,
+    attributes: *mut core::ffi::c_void,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Both spawn paths must really start something; breakaway only changes which job the child
+    /// belongs to, and a job that forbids it must not stop the watchdog from starting at all.
+    #[test]
+    fn detached_spawns_start_a_process() {
+        let cmd = r"C:\Windows\System32\cmd.exe";
+        for pid in [
+            spawn_detached(cmd, &["/c", "exit", "0"]).expect("plain spawn"),
+            spawn_detached_outside_job(cmd, &["/c", "exit", "0"]).expect("breakaway spawn"),
+        ] {
+            assert!(pid > 0);
+        }
     }
 }
