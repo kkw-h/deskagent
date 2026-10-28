@@ -462,10 +462,17 @@
 
     <section class="page" id="page-rules">
       <header class="page-header"><h2>整理规则</h2></header>
-      <div class="card"><div class="l"><span class="ic">&#xE8CB;</span><div><div class="t">新项目出现在桌面时自动归类</div><div class="s">先看快捷方式目标规则，再按列表顺序匹配；都不符合的放进“桌面”栅栏</div></div></div><div class="toggle" role="switch" tabindex="0" data-bind="rules.keepUpdated"></div></div>
+      <div class="card"><div class="l"><span class="ic">&#xE8CB;</span><div><div class="t">新项目出现在桌面时自动归类</div><div class="s">先看快捷方式目标规则，再按软件语义归类；都不符合的放进“桌面”栅栏</div></div></div><div class="toggle" role="switch" tabindex="0" data-bind="rules.keepUpdated"></div></div>
       <div class="card"><div class="l"><span class="ic">&#xE718;</span><div><div class="t">没有命中规则的项目</div><div class="s">应用规则时，已在某个栅栏里但不符合任何规则的项目放在哪里；不符合规则的新项目总是放进“桌面”栅栏</div></div></div>
         <select data-bind="rules.unmatched"><option value="defaultTarget">回到“桌面”栅栏</option><option value="stay">留在当前栅栏</option></select></div>
       <div class="card"><div class="l"><span class="ic">&#xE8AB;</span><div><div class="t">立即对桌面上的全部项目应用规则</div><div class="s">手动摆放过的项目保持原位</div></div></div><button id="applyRules">立即应用</button></div>
+      <h3>智能整理</h3>
+      <div class="card"><div class="l"><span class="ic">&#xE9D9;</span><div><div class="t">按软件语义自动分组</div><div class="s">识别每个图标是什么软件，先看分组结果，确认后再建栅栏并移动</div></div></div><button id="semanticPlan">预览分组</button></div>
+      <div id="semanticPreview" class="card stack" hidden>
+        <div class="l"><div><div class="t">分组预览</div><div class="s" id="semanticSummary"></div></div></div>
+        <div class="rows" id="semanticGroups"></div>
+        <div class="newrule-foot"><button id="semanticCancel">取消</button><button class="accent" id="semanticApply">确认并整理</button></div>
+      </div>
       <h3>快速添加</h3>
       <div class="card stack"><div class="l"><span class="ic">&#xE8F4;</span><div><div class="t">一键创建栅栏并添加规则</div><div class="s">“待清理”只归拢 30 天没用过的安装包和压缩包，不删除任何文件</div></div></div>
         <div class="chips" id="templates">
@@ -483,6 +490,7 @@
             <option value="type">文件类型</option><option value="ext">扩展名（逗号分隔）</option>
             <option value="contains">名称包含</option><option value="notContains">名称不包含</option><option value="startsWith">名称开头是</option><option value="endsWith">名称结尾是</option><option value="exact">完整文件名（含扩展名，用逗号分隔）</option>
             <option value="glob">通配符（*.png）</option><option value="target">快捷方式目标包含</option>
+            <option value="company">公司名包含</option>
             <option value="time">创建时段</option><option value="weekday">创建于星期几</option><option value="size">大小范围（MB）</option>
             <option value="idle">闲置天数（未修改也未打开）</option>
             <option value="folders">仅文件夹</option><option value="files">仅文件</option><option value="plain">普通文件（程序和快捷方式除外）</option></select></label>
@@ -1010,6 +1018,7 @@
   function targetLabel(target) { return tf("“{0}”", target === 'inbox' ? inboxTitle() : (target && target.fence) ? fenceTitle(target.fence) : '?'); }
   const NAME_OPS = {contains:v=>tf("名称包含“{0}”",v),notContains:v=>tf("名称不包含“{0}”",v),startsWith:v=>tf("名称开头是“{0}”",v),endsWith:v=>tf("名称结尾是“{0}”",v),is:v=>tf("名称等于“{0}”",v)};
   const TARGET_OPS = {contains:v=>tf("快捷方式目标包含“{0}”",v),notContains:v=>tf("快捷方式目标不包含“{0}”",v),startsWith:v=>tf("快捷方式目标开头是“{0}”",v),endsWith:v=>tf("快捷方式目标结尾是“{0}”",v),is:v=>tf("快捷方式目标等于“{0}”",v)};
+  const COMPANY_OPS = {contains:v=>tf("公司名包含“{0}”",v)};
   const WEEK = () => [t("周一"),t("周二"),t("周三"),t("周四"),t("周五"),t("周六"),t("周日")]; // 0 = Monday
   const hm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
   function condLabel(c) {
@@ -1021,6 +1030,7 @@
       case 'name': return (NAME_OPS[v.op] || NAME_OPS.contains)(v.value);
       case 'glob': return tf("匹配 {0}", v);
       case 'shortcutTarget': return (TARGET_OPS[v.op] || TARGET_OPS.contains)(v.value);
+      case 'company': return (COMPANY_OPS[v.op] || COMPANY_OPS.contains)(v.value);
       case 'foldersOnly': return t("仅文件夹");
       case 'filesOnly': return t("仅文件");
       case 'plainFiles': return t("普通文件");
@@ -1110,7 +1120,7 @@
     document.getElementById('nrWeek').style.display = k === 'weekday' ? '' : 'none';
     document.getElementById('nrSize').style.display = k === 'size' ? '' : 'none';
     document.getElementById('nrIdle').style.display = k === 'idle' ? '' : 'none';
-    const ph = { ext: 'png, jpg', contains: t("示例\x04截图"), notContains: t("示例\x04备份"), startsWith: 'IMG_', endsWith: '_final', exact: 'todo.txt, notes.md', glob: '*.png', target: 'steam' };
+    const ph = { ext: 'png, jpg', contains: t("示例\x04截图"), notContains: t("示例\x04备份"), startsWith: 'IMG_', endsWith: '_final', exact: 'todo.txt, notes.md', glob: '*.png', target: 'steam', company: 'Valve' };
     document.getElementById('nrValue').placeholder = ph[k] || '';
     const wk = document.getElementById('nrWeek');
     if (!wk.children.length) wk.innerHTML = WEEKDAYS().map(([v, l]) => `<label><input type="checkbox" value="${v}">${l}</label>`).join('');
@@ -1140,6 +1150,7 @@
     else if (kind === 'exact') { const names = split(value); if (!names.length) return ruleError(t("请输入完整文件名"), 'nrValue'); cond = { cond: 'exactName', value: names }; cls = 'name'; }
     else if (kind === 'glob') { if (!value) return ruleError(t("请输入通配符"), 'nrValue'); cond = { cond: 'glob', value }; cls = 'name'; }
     else if (kind === 'target') { if (!value) return ruleError(t("请输入目标路径中的关键字"), 'nrValue'); cond = { cond: 'shortcutTarget', value: { op: 'contains', value } }; cls = 'target'; }
+    else if (kind === 'company') { if (!value) return ruleError(t("请输入公司名关键字"), 'nrValue'); cond = { cond: 'company', value: { op: 'contains', value } }; cls = 'target'; }
     else if (kind === 'time') {
       const from = document.getElementById('nrFrom'), to = document.getElementById('nrTo');
       if (!from.value || !from.validity.valid) return ruleError(t("请输入开始时间"), 'nrFrom');
@@ -1177,6 +1188,34 @@
     document.getElementById('nrName').value = ''; document.getElementById('nrValue').value = '';
   };
   document.getElementById('applyRules').onclick = () => send({ type: 'action', name: 'applyRules' });
+  // 智能整理：先出预览再动手。判断在主程序里做（内置规则包），这里只负责展示和确认，
+  // 所以点错一下不会移动任何图标。
+  function renderSemantics(plan) {
+    const groups = plan.groups || [];
+    const unclassified = plan.unclassified || [];
+    document.getElementById('semanticSummary').textContent = groups.length
+      ? tf("共 {0} 个分组，{1} 个项目", groups.length, plan.moved)
+      : t("没有值得单独建栅栏的分组");
+    const list = document.getElementById('semanticGroups');
+    list.innerHTML = '';
+    groups.forEach(g => {
+      const div = document.createElement('div');
+      div.className = 'card rule';
+      div.innerHTML = `<div class="row"><div class="text"><div class="t">${esc(g.title)}</div><div class="conds">${esc((g.items || []).map(i => i.name).join(t("、")))}</div></div></div>`;
+      list.appendChild(div);
+    });
+    if (unclassified.length) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = `<div class="s">${esc(tf("留在桌面：{0} 个项目", unclassified.length))}</div>`;
+      list.appendChild(div);
+    }
+    document.getElementById('semanticPreview').hidden = false;
+    document.getElementById('semanticApply').disabled = !groups.length;
+  }
+  document.getElementById('semanticPlan').onclick = () => send({ type: 'action', name: 'semanticsPlan' });
+  document.getElementById('semanticCancel').onclick = () => { document.getElementById('semanticPreview').hidden = true; };
+  document.getElementById('semanticApply').onclick = () => { document.getElementById('semanticPreview').hidden = true; send({ type: 'action', name: 'semanticsApply' }); };
   document.querySelectorAll('#templates [data-template]').forEach(b => { b.onclick = () => send({ type: 'action', name: 'addTemplate', template: b.dataset.template }); });
   document.getElementById('snapSave').onclick = () => { const n = document.getElementById('snapName').value; send({ type: 'action', name: 'saveSnapshot', snapshotName: n }); document.getElementById('snapName').value = ''; };
   document.getElementById('cfgExport').onclick = () => send({ type: 'action', name: 'exportConfig' });
@@ -1379,6 +1418,7 @@
     else if (m.type === 'feedbackInfo') { fbInfo = m; fbCrash ||= !!m.crashed; renderFeedback(); }
     else if (m.type === 'showFeedback') showFeedback(!!m.crash);
     else if (m.type === 'toast') toast(m.text, !!m.error);
+  else if (m.type === 'semantics') renderSemantics(m.plan);
     else if (m.type === 'update') { update = m.update; renderUpdate(); }
     else if (m.type === 'peekHotkeyResult') {
       // Saved: recording is over (the host registered the new shortcut). Refused: the page

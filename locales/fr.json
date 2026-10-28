@@ -546,5 +546,19 @@
   "每个功能都有动画演示": "Chaque fonction avec une courte animation",
   "桌面整理好了": "Votre Bureau est rangé",
   "文件都没有移动，只是显示在栅栏里。\n在桌面空白处拖出一个框可新建栅栏，双击空白处可隐藏或显示栅栏。": "Vos fichiers n’ont pas bougé : les groupes ne font que les afficher.\nTracez un cadre sur un espace vide du Bureau pour créer un groupe, ou double-cliquez dessus pour masquer ou afficher les groupes.",
-  "没有匹配的文件": "Aucun fichier correspondant"
+  "没有匹配的文件": "Aucun fichier correspondant",
+  "智能整理": "Rangement intelligent",
+  "按软件语义自动分组": "Grouper selon le type d’application",
+  "识别每个图标是什么软件，先看分组结果，确认后再建栅栏并移动": "Identifie chaque icône, affiche d’abord les groupes, puis crée les clôtures et déplace après confirmation",
+  "预览分组": "Aperçu des groupes",
+  "分组预览": "Aperçu des groupes",
+  "共 {0} 个分组，{1} 个项目": "{0} groupes, {1} éléments",
+  "没有值得单独建栅栏的分组": "Aucun groupe ne mérite sa propre clôture",
+  "留在桌面：{0} 个项目": "Restent sur le bureau : {0} éléments",
+  "确认并整理": "Ranger",
+  "公司名包含": "Nom d’entreprise contient",
+  "公司名包含“{0}”": "Nom d’entreprise contient « {0} »",
+  "请输入公司名关键字": "Saisissez une partie du nom d’entreprise",
+  "已按软件语义整理 {0} 个项目": "{0} éléments rangés selon le type d’application",
+  "先看快捷方式目标规则，再按软件语义归类；都不符合的放进“桌面”栅栏": "Vérifie d’abord les règles de cible des raccourcis, puis groupe selon le type d’application ; le reste va dans la clôture « Bureau »"
 }

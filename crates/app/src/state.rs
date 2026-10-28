@@ -852,7 +852,7 @@ impl AppState {
         let company = shortcut_target
             .as_deref()
             .filter(|t| t.to_lowercase().ends_with(".exe"))
-            .and_then(|t| deskagent_scan::read_version(t))
+            .and_then(deskagent_scan::read_version)
             .map(|v| v.company)
             .filter(|c| !c.is_empty());
 

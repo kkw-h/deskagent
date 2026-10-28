@@ -546,5 +546,19 @@
   "每个功能都有动画演示": "Cada función con una breve animación",
   "桌面整理好了": "Tu escritorio está ordenado",
   "文件都没有移动，只是显示在栅栏里。\n在桌面空白处拖出一个框可新建栅栏，双击空白处可隐藏或显示栅栏。": "Tus archivos no se han movido; los grupos solo los muestran.\nDibuja un recuadro en un área vacía del escritorio para crear un grupo, o haz doble clic en ella para ocultar o mostrar los grupos.",
-  "没有匹配的文件": "Ningún archivo coincide"
+  "没有匹配的文件": "Ningún archivo coincide",
+  "智能整理": "Organización inteligente",
+  "按软件语义自动分组": "Agrupar por tipo de aplicación",
+  "识别每个图标是什么软件，先看分组结果，确认后再建栅栏并移动": "Reconoce cada icono, muestra primero los grupos y solo crea vallas y mueve tras confirmar",
+  "预览分组": "Ver grupos",
+  "分组预览": "Vista previa de grupos",
+  "共 {0} 个分组，{1} 个项目": "{0} grupos, {1} elementos",
+  "没有值得单独建栅栏的分组": "Ningún grupo merece una valla propia",
+  "留在桌面：{0} 个项目": "Se quedan en el escritorio: {0} elementos",
+  "确认并整理": "Organizar",
+  "公司名包含": "El nombre de la empresa contiene",
+  "公司名包含“{0}”": "El nombre de la empresa contiene «{0}»",
+  "请输入公司名关键字": "Escribe parte del nombre de la empresa",
+  "已按软件语义整理 {0} 个项目": "{0} elementos organizados por tipo de aplicación",
+  "先看快捷方式目标规则，再按软件语义归类；都不符合的放进“桌面”栅栏": "Comprueba primero las reglas de destino de los accesos directos y luego agrupa por tipo de aplicación; lo que no encaje va a la valla «Escritorio»"
 }

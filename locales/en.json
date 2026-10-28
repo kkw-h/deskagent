@@ -546,5 +546,19 @@
   "每个功能都有动画演示": "Every feature, with a short animation",
   "桌面整理好了": "Your desktop is tidied up",
   "文件都没有移动，只是显示在栅栏里。\n在桌面空白处拖出一个框可新建栅栏，双击空白处可隐藏或显示栅栏。": "Your files haven't moved; the fences just show them.\nDrag a box on empty desktop space to add a fence, or double-click it to hide or show the fences.",
-  "没有匹配的文件": "No matching files"
+  "没有匹配的文件": "No matching files",
+  "智能整理": "Smart organization",
+  "按软件语义自动分组": "Group by what each app is",
+  "识别每个图标是什么软件，先看分组结果，确认后再建栅栏并移动": "Reads what each icon is, shows the groups first, and only creates fences and moves things once you confirm",
+  "预览分组": "Preview groups",
+  "分组预览": "Group preview",
+  "共 {0} 个分组，{1} 个项目": "{0} groups, {1} items",
+  "没有值得单独建栅栏的分组": "No group is big enough to deserve a fence",
+  "留在桌面：{0} 个项目": "Staying on the desktop: {0} items",
+  "确认并整理": "Organize",
+  "公司名包含": "Company name contains",
+  "公司名包含“{0}”": "Company name contains “{0}”",
+  "请输入公司名关键字": "Enter part of the company name",
+  "已按软件语义整理 {0} 个项目": "Organized {0} items by what they are",
+  "先看快捷方式目标规则，再按软件语义归类；都不符合的放进“桌面”栅栏": "Checks shortcut-target rules first, then groups by what each app is; anything left goes to the “Desktop” fence"
 }

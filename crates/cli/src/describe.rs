@@ -323,9 +323,15 @@ pub const COMMANDS: &[Entry] = &[
     ),
 ];
 
-/// Methods reachable only through a flag of a command listed above.
+/// Methods reachable only through a flag of a command listed above, or only from the GUI
+/// (the settings page's 智能整理 card drives `semantics.*`; scripts use `deskagent` instead).
 #[cfg(test)]
-const EXTRA_METHODS: &[&str] = &["fences.moveToMonitor", "items.planMove"];
+const EXTRA_METHODS: &[&str] = &[
+    "fences.moveToMonitor",
+    "items.planMove",
+    "semantics.plan",
+    "semantics.apply",
+];
 
 pub const ERROR_CODES: &[(ErrorCode, &str)] = &[
     (

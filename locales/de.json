@@ -546,5 +546,19 @@
   "每个功能都有动画演示": "Jede Funktion mit kurzer Animation",
   "桌面整理好了": "Dein Desktop ist aufgeräumt",
   "文件都没有移动，只是显示在栅栏里。\n在桌面空白处拖出一个框可新建栅栏，双击空白处可隐藏或显示栅栏。": "Deine Dateien bleiben, wo sie sind; die Bereiche zeigen sie nur an.\nZieh auf freier Desktopfläche einen Rahmen auf, um einen Bereich anzulegen, oder doppelklicke dort, um die Bereiche aus- und einzublenden.",
-  "没有匹配的文件": "Keine passenden Dateien"
+  "没有匹配的文件": "Keine passenden Dateien",
+  "智能整理": "Intelligentes Aufräumen",
+  "按软件语义自动分组": "Nach Anwendungsart gruppieren",
+  "识别每个图标是什么软件，先看分组结果，确认后再建栅栏并移动": "Erkennt, was jedes Symbol ist, zeigt zuerst die Gruppen und legt erst nach der Bestätigung Zäune an und verschiebt",
+  "预览分组": "Gruppen ansehen",
+  "分组预览": "Gruppenvorschau",
+  "共 {0} 个分组，{1} 个项目": "{0} Gruppen, {1} Elemente",
+  "没有值得单独建栅栏的分组": "Keine Gruppe ist groß genug für einen eigenen Zaun",
+  "留在桌面：{0} 个项目": "Bleiben auf dem Desktop: {0} Elemente",
+  "确认并整理": "Aufräumen",
+  "公司名包含": "Firmenname enthält",
+  "公司名包含“{0}”": "Firmenname enthält „{0}“",
+  "请输入公司名关键字": "Teil des Firmennamens eingeben",
+  "已按软件语义整理 {0} 个项目": "{0} Elemente nach Anwendungsart aufgeräumt",
+  "先看快捷方式目标规则，再按软件语义归类；都不符合的放进“桌面”栅栏": "Prüft zuerst Regeln zum Verknüpfungsziel und gruppiert danach nach Anwendungsart; der Rest kommt in den Zaun „Desktop“"
 }

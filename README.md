@@ -3,7 +3,8 @@
 Windows 11 桌面栅栏工具，内置基于软件语义的自动分类。
 
 PecoFence 负责栅栏、玻璃渲染、折叠、标签页、多屏布局；DeskAgent 负责回答「这个图标到底是什么软件」。
-两者现在是同一个 workspace，一套构建，一个产品。
+两者现在是同一个 workspace，一套构建，一个产品——**分类能力跑在应用进程里**，不再需要另装一个 CLI。
+设置 →「整理规则」→「智能整理」先给分组预览，确认后才建栅栏、移图标。
 
 ## 这个仓库怎么来的
 
@@ -92,6 +93,27 @@ pecofence-cli rule add --name Games --company-contains Valve --to Games
 
 为此把 `client.rs` 从 `crates/cli` 移进了 `crates/ipc`——IPC 客户端本来就该和协议在一起。
 
+### 4. 语义分类搬进应用本体
+
+前三步只是打通了数据和协议，判断本身还留在外部 CLI 里。现在它也在应用里了：
+
+| 位置 | 做什么 |
+|---|---|
+| `crates/app/src/semantics.rs` | 内置规则包 `include_str!` 编进来；桌面条目 → 分类记录 → 分组（纯函数，有单测） |
+| `crates/app/src/app/semantics.rs` | 预览、落地（先存快照）、按标题复用已有栅栏、在空位新建 |
+| IPC `semantics.plan` / `semantics.apply` | 预览只读；落地会建栅栏、移条目，返回逐组结果 |
+| 设置页「智能整理」 | 分组预览 → 确认并整理；规则编辑器新增「公司名包含」条件 |
+| 新条目自动归类 | 「新项目出现时自动归类」打开时，属性规则先判，规则表达不了的交给语义 |
+
+两条边界是刻意留的：
+
+- **规则优先。** 扩展名、类型这些属性规则认得出的，语义不再插手——与对照实验的结论一致
+  （文档类规则又快又免费，AI 没有优势）。
+- **一个条目不新建栅栏。** 它能进**已存在**的同名栅栏；要新建栅栏至少两个条目，
+  否则每拖进一个文件就长出一个只有一个图标的栅栏。
+
+`deskagent` CLI 仍然保留：它做评测（`eval`/`bench`）、批量分析，以及没有 GUI 的场景。
+
 ## 命令
 
 ```bash
@@ -101,11 +123,12 @@ pecofence-cli skill               # 给编码 agent 的使用指南
 pecofence-cli status
 pecofence-cli fence list
 pecofence-cli rule add --name PDFs --ext pdf --to Docs
+pecofence-cli rule add --name Games --company-contains Valve --to Games
 
 # DeskAgent（输出人可读文本，面向分析与评测）
 deskagent classify                # 扫描桌面并分类
 deskagent plan [--llm]            # 生成方案，不触碰系统
-deskagent apply [--yes]           # 落地到 PecoFence
+deskagent apply [--yes]           # 落地到 PecoFence（GUI 里也有同样的入口）
 deskagent watch [--once]          # 增量守护
 deskagent eval --labels <YAML>    # 用带标注的样本评测规则包
 deskagent bench --labels <YAML>   # 对照实验：规则 vs 模型的人工操作成本
@@ -166,6 +189,7 @@ deskagent bench --labels <YAML>   # 对照实验：规则 vs 模型的人工操�
 - [评测报告.md](评测报告.md) — 规则包在三个数据集上的实测结果与局限
 - [竞品与技术调研.md](竞品与技术调研.md) — 14 个开源竞品与三条技术路线
 - [产品方案.html](产品方案.html) — 可视化方案概览
+- [docs/工程备忘.md](docs/工程备忘.md) — 本机环境事实、已修的坑、方法论教训
 - [docs/](docs/) — PecoFence 原项目文档（CLI 参考、架构说明）
 
 ## 许可证

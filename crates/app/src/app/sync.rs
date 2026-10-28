@@ -290,7 +290,23 @@ impl App {
             }
             entries.extend(shell::enumerate_special_desktop_items());
         }
+        // 新出现的条目：语义归类只看这一批，已存在的条目保持规则/用户的结果。
+        let fresh: Vec<shell::DesktopEntry> = if self.state.config.rules.keep_updated {
+            entries
+                .iter()
+                .filter(|e| {
+                    e.origin != shell::EntryOrigin::Namespace
+                        && self.state.item_id_for_path(&e.path).is_none()
+                })
+                .cloned()
+                .collect()
+        } else {
+            Vec::new()
+        };
         let report = self.state.sync_desktop_partly_read(&entries, &unread);
+        if !fresh.is_empty() {
+            self.route_fresh_semantically(&fresh);
+        }
         if let Some(at) = self.state.take_tmp_settle_at() {
             let wait_s = (at - pecofence_core::now_unix()).max(0) as u32;
             window::set_timer(self.control.hwnd(), TIMER_TMP_SETTLE, wait_s * 1000 + 500);

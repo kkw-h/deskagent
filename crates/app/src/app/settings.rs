@@ -497,6 +497,28 @@ impl App {
                         &[moved.to_string()],
                     ));
                 }
+                Some("semanticsPlan") => {
+                    let plan = self.semantic_plan_json(crate::semantics::DEFAULT_MIN_ITEMS);
+                    if let Some(h) = &self.settings {
+                        h.post_json(
+                            &serde_json::json!({ "type": "semantics", "plan": plan }).to_string(),
+                        );
+                    }
+                }
+                Some("semanticsApply") => {
+                    let min = crate::semantics::DEFAULT_MIN_ITEMS;
+                    match self.semantic_apply(min) {
+                        Ok(result) => {
+                            let moved = result.get("moved").and_then(|v| v.as_u64()).unwrap_or(0);
+                            let message = pecofence_core::i18n::format(
+                                "已按软件语义整理 {0} 个项目",
+                                &[moved.to_string()],
+                            );
+                            self.settings_toast(&message);
+                        }
+                        Err(e) => self.settings_error(&e.to_string()),
+                    }
+                }
                 Some("addTemplate") => {
                     if let Some(template) = v
                         .get("template")

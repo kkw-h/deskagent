@@ -68,6 +68,7 @@ mod peek;
 mod portals;
 mod push;
 mod rating;
+mod semantics;
 mod settings;
 mod sync;
 mod tabs;

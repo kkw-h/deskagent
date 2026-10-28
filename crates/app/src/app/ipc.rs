@@ -828,6 +828,15 @@ impl App {
                 ))
             }
 
+            Method::SemanticsPlan { min_items } => {
+                let min = min_items.unwrap_or(crate::semantics::DEFAULT_MIN_ITEMS);
+                Ok(self.semantic_plan_json(min))
+            }
+            Method::SemanticsApply { min_items } => {
+                let min = min_items.unwrap_or(crate::semantics::DEFAULT_MIN_ITEMS);
+                self.semantic_apply(min)
+            }
+
             Method::SnapshotsSave { name } => {
                 let name = checked_name("snapshot name", name)?;
                 if self.state.config.snapshots.len() >= pecofence_core::MAX_SNAPSHOTS {
@@ -1428,7 +1437,7 @@ impl App {
                 company: shortcut_target
                     .as_deref()
                     .filter(|t| t.to_lowercase().ends_with(".exe"))
-                    .and_then(|t| deskagent_scan::read_version(t))
+                    .and_then(deskagent_scan::read_version)
                     .map(|v| v.company)
                     .filter(|c| !c.is_empty()),
                 ..Default::default()
@@ -1558,7 +1567,7 @@ impl App {
     /// `auto-cli-<yyyy-mm-dd HH:MM:SS>` snapshot of the current layouts, keeping only the newest
     /// few. Older auto snapshots make room first; when the list is still full of the user's own
     /// snapshots none is taken (a warning is queued) rather than evicting one of theirs.
-    fn auto_snapshot(&mut self) -> Option<Uuid> {
+    pub(super) fn auto_snapshot(&mut self) -> Option<Uuid> {
         if !auto_snapshot_slot(&mut self.state.config.snapshots, None) {
             self.ipc_warnings.push(SNAPSHOT_LIMIT_WARNING.to_string());
             return None;

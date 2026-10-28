@@ -546,5 +546,19 @@
   "每个功能都有动画演示": "Cada recurso com uma animação curta",
   "桌面整理好了": "Sua área de trabalho está organizada",
   "文件都没有移动，只是显示在栅栏里。\n在桌面空白处拖出一个框可新建栅栏，双击空白处可隐藏或显示栅栏。": "Seus arquivos não foram movidos; os grupos só os exibem.\nDesenhe um retângulo em um espaço vazio da área de trabalho para criar um grupo, ou clique duas vezes nele para ocultar ou mostrar os grupos.",
-  "没有匹配的文件": "Nenhum arquivo correspondente"
+  "没有匹配的文件": "Nenhum arquivo correspondente",
+  "智能整理": "Organização inteligente",
+  "按软件语义自动分组": "Agrupar pelo tipo de aplicativo",
+  "识别每个图标是什么软件，先看分组结果，确认后再建栅栏并移动": "Reconhece cada ícone, mostra os grupos primeiro e só cria cercas e move depois da confirmação",
+  "预览分组": "Pré-visualizar grupos",
+  "分组预览": "Prévia dos grupos",
+  "共 {0} 个分组，{1} 个项目": "{0} grupos, {1} itens",
+  "没有值得单独建栅栏的分组": "Nenhum grupo merece uma cerca própria",
+  "留在桌面：{0} 个项目": "Ficam na área de trabalho: {0} itens",
+  "确认并整理": "Organizar",
+  "公司名包含": "O nome da empresa contém",
+  "公司名包含“{0}”": "O nome da empresa contém “{0}”",
+  "请输入公司名关键字": "Digite parte do nome da empresa",
+  "已按软件语义整理 {0} 个项目": "{0} itens organizados pelo tipo de aplicativo",
+  "先看快捷方式目标规则，再按软件语义归类；都不符合的放进“桌面”栅栏": "Verifica primeiro as regras de destino dos atalhos e depois agrupa pelo tipo de aplicativo; o que sobrar vai para a cerca “Área de Trabalho”"
 }

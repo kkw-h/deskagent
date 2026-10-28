@@ -20,9 +20,12 @@ pecofence-core = { path = "../core" }
 pecofence-ipc = { path = "../ipc" }
 pecofence-platform = { path = "../platform" }
 pecofence-render = { path = "../render" }
-# 读目标可执行文件的 PE 版本信息，给规则引擎的 company 条件提供数据。
-# 纯 Rust（pelite），不引入新的系统依赖。
+# DeskAgent 的语义分类现在跑在应用里：读 .lnk 目标 / PE 版本信息（scan），
+# 匹配内置规则包（classify），按分组顺序排版（compile 的 GROUP_ORDER）。
+# 全是纯 Rust，不引入新的系统依赖。
 deskagent-scan = { path = "../scan" }
+deskagent-classify = { path = "../classify" }
+deskagent-compile = { path = "../compile" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
