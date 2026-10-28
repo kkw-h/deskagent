@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
 use deskagent_classify::{Item, RulePack};
+use deskagent_compile as compile;
+use deskagent_pecofence as pecofence;
 
 /// 内置规则包随二进制发布，避免运行期依赖文件路径。
 const BUILTIN_RULES: &str = include_str!("../../../rules/builtin.yaml");
@@ -67,6 +69,36 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// 生成整理方案，不触碰系统
+    Plan {
+        /// 扫描指定目录，可重复；缺省时扫桌面
+        #[arg(long, value_name = "DIR")]
+        dir: Vec<PathBuf>,
+        /// 少于这个条目数的分组不建栅栏
+        #[arg(long, default_value_t = 2)]
+        min_items: usize,
+        /// 以 JSON 输出
+        #[arg(long)]
+        json: bool,
+    },
+    /// 把方案落地到 PecoFence
+    Apply {
+        /// 扫描指定目录，可重复；缺省时扫桌面
+        #[arg(long, value_name = "DIR")]
+        dir: Vec<PathBuf>,
+        /// 少于这个条目数的分组不建栅栏
+        #[arg(long, default_value_t = 2)]
+        min_items: usize,
+        /// 覆盖自动探测的工作区，格式 x,y,w,h（物理像素，虚拟屏坐标）
+        #[arg(long, value_name = "RECT")]
+        area: Option<String>,
+        /// 只演示，不修改任何东西
+        #[arg(long)]
+        dry_run: bool,
+        /// 确认执行。没有这个标志时只做 dry-run
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -92,7 +124,289 @@ fn main() -> anyhow::Result<()> {
             rules,
             json,
         } => classify_json(&input, rules.as_deref(), json),
+        Cmd::Plan {
+            dir,
+            min_items,
+            json,
+        } => plan(&dir, min_items, json),
+        Cmd::Apply {
+            dir,
+            min_items,
+            area,
+            dry_run,
+            yes,
+        } => apply(&dir, min_items, area.as_deref(), dry_run, yes),
     }
+}
+
+// ---------------------------------------------------------------- 方案
+
+fn build_plan(dirs: &[PathBuf], min_items: usize) -> anyhow::Result<compile::Plan> {
+    let items = collect(dirs)?;
+    let pack = RulePack::from_yaml(BUILTIN_RULES)?;
+    let opts = compile::Options { min_items };
+    Ok(compile::build(&items, &pack, &opts))
+}
+
+fn plan(dirs: &[PathBuf], min_items: usize, json: bool) -> anyhow::Result<()> {
+    let p = build_plan(dirs, min_items)?;
+
+    if json {
+        let payload = serde_json::json!({
+            "total": p.total,
+            "moved": p.moved(),
+            "fences": p.fences.iter().map(|f| serde_json::json!({
+                "title": f.title,
+                "count": f.count(),
+                "items": f.items,
+            })).collect::<Vec<_>>(),
+            "skipped": p.skipped.iter().map(|s| serde_json::json!({
+                "name": s.name, "reason": s.reason,
+            })).collect::<Vec<_>>(),
+        });
+        println!("{}", serde_json::to_string_pretty(&payload)?);
+        return Ok(());
+    }
+
+    print_plan(&p);
+    Ok(())
+}
+
+fn print_plan(p: &compile::Plan) {
+    println!(
+        "条目 {}  归入栅栏 {}  留在桌面 {}",
+        p.total,
+        p.moved(),
+        p.skipped.len()
+    );
+    println!("{}", "-".repeat(76));
+    for f in &p.fences {
+        println!("{}（{}）", f.title, f.count());
+        for path in &f.items {
+            println!("    {}", file_label(path));
+        }
+    }
+    if !p.skipped.is_empty() {
+        println!("{}", "-".repeat(76));
+        println!("留在桌面（{}）", p.skipped.len());
+        for s in &p.skipped {
+            println!("    {:<24} {}", s.name, s.reason);
+        }
+    }
+}
+
+fn file_label(path: &str) -> String {
+    path.rsplit(['\\', '/']).next().unwrap_or(path).to_string()
+}
+
+fn apply(
+    dirs: &[PathBuf],
+    min_items: usize,
+    area_override: Option<&str>,
+    dry_run: bool,
+    yes: bool,
+) -> anyhow::Result<()> {
+    let p = build_plan(dirs, min_items)?;
+    print_plan(&p);
+
+    if p.fences.is_empty() {
+        println!("\n没有达到建栅栏阈值的分组，无事可做。");
+        return Ok(());
+    }
+
+    // PecoFence 不在场时也要能出方案，所以这里是 Option 而不是错误
+    let cli = pecofence::Cli::discover().ok();
+    let area = match area_override {
+        Some(s) => parse_area(s).ok_or_else(|| anyhow::anyhow!("--area 格式应为 x,y,w,h"))?,
+        None => cli
+            .as_ref()
+            .and_then(work_area)
+            .unwrap_or_else(compile::fallback_area),
+    };
+    let rects = compile::layout(p.fences.len(), area);
+    println!(
+        "\n布局区域 x={} y={} w={} h={}，共 {} 个栅栏",
+        area.x,
+        area.y,
+        area.w,
+        area.h,
+        p.fences.len()
+    );
+
+    let mutate = yes && !dry_run;
+    if !mutate {
+        println!("\n[dry-run] 以下动作会被执行，加 --yes 才会真正修改：");
+        for (i, f) in p.fences.iter().enumerate() {
+            println!(
+                "    fence create --title {} --rect {}",
+                f.title,
+                rects[i].to_arg()
+            );
+            println!("    item move <{} 项> --to {}", f.count(), f.title);
+        }
+        println!("\n注意：item move 会改变图标所属栅栏，确认无误再加 --yes。");
+        return Ok(());
+    }
+
+    let cli = cli.ok_or(pecofence::Error::NotFound)?;
+    println!("\npecofence-cli: {}", cli.path().display());
+
+    // 先确认应用在运行，否则后面每一步都会失败
+    cli.status().map_err(|e| match e {
+        pecofence::Error::NotRunning => anyhow::anyhow!("PecoFence 没有在运行，请先启动它"),
+        other => anyhow::anyhow!(other),
+    })?;
+
+    // 有副作用前先存快照，出问题能回滚布局
+    let stamp = timestamp();
+    let snap = cli.snapshot_save(&format!("deskagent-{stamp}"))?;
+    let snap_id = snap
+        .get("snapshot")
+        .and_then(|s| s.get("id"))
+        .and_then(|i| i.as_str())
+        .unwrap_or("(未返回)")
+        .to_string();
+    println!("\n已保存布局快照 {snap_id}，回滚用：pecofence-cli snapshot restore {snap_id}");
+
+    // 已存在的同名栅栏直接复用，避免重复运行时堆出一串同名栅栏。
+    // 只复用普通栅栏：portal 背后是真实文件夹，往里 move 会移动真实文件。
+    let list = cli.list_fences()?;
+    let reusable = pecofence::reusable_titles(&list);
+    let blocked: Vec<String> = pecofence::all_titles(&list)
+        .into_iter()
+        .filter(|t| !reusable.contains(t))
+        .collect();
+
+    let mut blocked_groups: Vec<String> = Vec::new();
+    for (i, f) in p.fences.iter().enumerate() {
+        if blocked.contains(&f.title) {
+            // 再建一个同名栅栏会让 --to 变成 ambiguous_fence，只能整组跳过
+            println!(
+                "跳过「{}」：已有同名栅栏，但它是文件夹栅栏或标签页。往里搬会移动真实文件，或导致选择歧义。",
+                f.title
+            );
+            blocked_groups.push(f.title.clone());
+            continue;
+        }
+        if reusable.contains(&f.title) {
+            println!("栅栏「{}」已存在，复用", f.title);
+            continue;
+        }
+        if let Err(e) = cli.create_fence_rect(&f.title, &rects[i].to_arg()) {
+            eprintln!("创建栅栏「{}」失败：{e}", f.title);
+            return Err(e.into());
+        }
+        println!("已创建栅栏「{}」", f.title);
+    }
+
+    let mut failures = 0usize;
+    for f in &p.fences {
+        if blocked_groups.contains(&f.title) {
+            continue;
+        }
+        match cli.move_items(&f.items, &f.title, false) {
+            Ok(v) => {
+                let changed = v.get("changed").and_then(|c| c.as_bool()).unwrap_or(false);
+                if changed {
+                    println!("已移入「{}」{} 项", f.title, f.count());
+                } else {
+                    println!("「{}」状态已是目标状态，未变动", f.title);
+                }
+                if let Some(w) = v.get("warning").and_then(|w| w.as_str()) {
+                    println!("  提示：{w}");
+                }
+            }
+            Err(e) => {
+                failures += 1;
+                eprintln!("移入「{}」失败：{e}", f.title);
+            }
+        }
+    }
+
+    println!();
+    let done = p.fences.len() - blocked_groups.len();
+    // 被跳过的分组不能算进已归位
+    let moved: usize = p
+        .fences
+        .iter()
+        .filter(|f| !blocked_groups.contains(&f.title))
+        .map(|f| f.count())
+        .sum();
+    if failures == 0 {
+        println!("完成。{done} 个栅栏，{moved} 项已归位。");
+        if !blocked_groups.is_empty() {
+            println!(
+                "{} 个分组因标题冲突被跳过：{}",
+                blocked_groups.len(),
+                blocked_groups.join("、")
+            );
+        }
+        println!("不满意可以回滚布局：pecofence-cli snapshot restore {snap_id}");
+        Ok(())
+    } else {
+        anyhow::bail!("{failures} 个栅栏搬运失败，布局快照 {snap_id} 可用于回滚")
+    }
+}
+
+fn parse_area(s: &str) -> Option<compile::Rect> {
+    let parts: Vec<i64> = s
+        .split(',')
+        .map(|p| p.trim().parse::<i64>())
+        .collect::<Result<_, _>>()
+        .ok()?;
+    if parts.len() != 4 {
+        return None;
+    }
+    Some(compile::Rect {
+        x: parts[0],
+        y: parts[1],
+        w: parts[2],
+        h: parts[3],
+    })
+}
+
+/// 从 `monitor list` 里取主屏工作区。
+///
+/// 文档只说明「shows each monitor's rect, workArea and dpi」，没有给出精确字段形状，
+/// 所以这里同时接受 `{x,y,w,h}` 对象和 `[x,y,w,h]` 数组两种写法；
+/// 都读不出来就返回 None，由调用方回退到保守的默认区域。
+fn work_area(cli: &pecofence::Cli) -> Option<compile::Rect> {
+    let v = cli.list_monitors().ok()?;
+    let arr = v.as_array()?;
+    let pick = arr
+        .iter()
+        .find(|m| m.get("primary").and_then(|p| p.as_bool()).unwrap_or(false))
+        .or_else(|| arr.first())?;
+    let wa = pick.get("workArea").or_else(|| pick.get("rect"))?;
+    rect_of(wa)
+}
+
+fn rect_of(v: &serde_json::Value) -> Option<compile::Rect> {
+    if let Some(a) = v.as_array() {
+        if a.len() >= 4 {
+            return Some(compile::Rect {
+                x: a[0].as_i64()?,
+                y: a[1].as_i64()?,
+                w: a[2].as_i64()?,
+                h: a[3].as_i64()?,
+            });
+        }
+    }
+    Some(compile::Rect {
+        x: v.get("x")?.as_i64()?,
+        y: v.get("y")?.as_i64()?,
+        w: v.get("w")?.as_i64()?,
+        h: v.get("h")?.as_i64()?,
+    })
+}
+
+/// 快照名里的时间戳，避免同一秒重复运行时撞名。
+fn timestamp() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    format!("{secs}")
 }
 
 fn scan(dirs: &[PathBuf], json: bool) -> anyhow::Result<()> {

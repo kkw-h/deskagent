@@ -3,6 +3,8 @@ resolver = "2"
 members = [
     "crates/scan",
     "crates/classify",
+    "crates/compile",
+    "crates/pecofence",
     "crates/cli",
 ]
 

@@ -11,6 +11,8 @@ path = "src/main.rs"
 [dependencies]
 deskagent-scan = { path = "../scan" }
 deskagent-classify = { path = "../classify" }
+deskagent-compile = { path = "../compile" }
+deskagent-pecofence = { path = "../pecofence" }
 anyhow.workspace = true
 clap.workspace = true
 serde.workspace = true

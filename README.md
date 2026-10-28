@@ -54,9 +54,9 @@ Rust CLI。
 ```
 crates/scan       桌面枚举 + .lnk 深解析 + PE 版本信息
 crates/classify   规则引擎 + 置信度
-crates/compile    分类结果 → PecoFence 指令（M2）
-crates/pecofence  pecofence-cli 适配层（M1）
-crates/storage    SQLite（历史、学习规则、缓存）
+crates/compile    分类结果 → 栅栏方案 + 网格布局
+crates/pecofence  pecofence-cli 适配层
+crates/storage    SQLite（历史、学习规则、缓存，M2 起用）
 crates/cli        命令行入口
 ```
 
@@ -65,11 +65,14 @@ crates/cli        命令行入口
 
 ## 状态
 
-M0 已完成。当前可用命令：
+M0、M1 已完成。当前可用命令：
 
 ```bash
 deskagent scan                    # 扫桌面，列出条目与元数据覆盖
 deskagent classify                # 扫桌面并分类
+deskagent plan                    # 生成整理方案，不触碰系统
+deskagent apply                   # 打印要执行的动作（dry-run）
+deskagent apply --yes             # 真正建栅栏并搬图标
 deskagent eval --dir <DIR> --labels <YAML> --split all
 deskagent classify-json --input <JSON>   # 分类外部条目（注册表、清单文件）
 ```
@@ -87,13 +90,33 @@ deskagent classify-json --input <JSON>   # 分类外部条目（注册表、清�
 | 阶段 | 交付 | 通过条件 | 状态 |
 |---|---|---|---|
 | M0 | scan + classify，只输出方案 | 难点样本全部正确，准确率 ≥80% | 已完成 |
-| M1 | 落地到 PecoFence | 一条命令完成布局，快照可回滚 | 未开始 |
+| M1 | 落地到 PecoFence | 一条命令完成布局，快照可回滚 | 代码完成，待真机验证 |
 | M2 | 规则编译 + 增量守护 | 新图标 5 秒内归位建议 | 未开始 |
 | M3 | LLM 双模式 + 评测 | 操作数比手写规则低 50% | 未开始 |
 
 **生死线**：AI 分类是否真的比手写规则省事。M0 测出瓶颈在覆盖率（70% → 96%），
 但「AI 比手写规则省事」这个对照实验还没做——手写规则目前覆盖 96%，
 LLM 的价值只剩下「剩下 4% + 未知软件」。这个判断要等 M3 的数据。
+
+### M1 的三条安全约束
+
+`apply` 会真的改动桌面，所以做了三道防护：
+
+1. **先存快照**。任何修改前调 `snapshot save`，失败即中止。输出里给出回滚命令。
+2. **不碰 portal 栅栏**。portal 背后是磁盘上的真实文件夹，往 portal 里 `item move`
+   等于在资源管理器里搬文件。同名 portal 会被整组跳过，而不是复用。
+3. **`--yes` 才动手**。没有这个标志一律按 dry-run 处理，不依赖 PecoFence 是否安装。
+
+### M1 未验证的部分
+
+`pecofence-cli` 的参数和输出形状是**对源码核对**的，不是实测的——本机没装 PecoFence。
+核对过的形状记在 `crates/pecofence/src/lib.rs` 的模块注释里。真机首次运行时需要确认：
+
+- `fence create --rect` 在我们算出的网格坐标上不被 `invalid_value` 拒绝
+- `item move` 传完整 `.lnk` 路径能被正确识别为桌面条目
+- `monitor list` 的 `workArea` 在非 100% 缩放下取值符合预期
+
+参数拼装全部抽成了纯函数并有断言测试（25 个），因为这部分错了整个产品就错了。
 
 ## 历史
 

@@ -1,0 +1,9 @@
+[package]
+name = "deskagent-compile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+deskagent-classify = { path = "../classify" }
+serde.workspace = true
