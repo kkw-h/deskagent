@@ -58,7 +58,16 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "CLI build failed" }
   }
 
+  # `.cargo/config.toml` pins `build.target`, so cargo writes under <target-dir>/<triple>/release
+  # rather than <target-dir>/release. Accept either layout (the plain `release` folder may exist
+  # for host build scripts, so look for the executable, not the directory).
   $release = [IO.Path]::GetFullPath((Join-Path $TargetDir "release"))
+  if (-not (Test-Path -LiteralPath (Join-Path $release "pecofence.exe") -PathType Leaf)) {
+    $triple = Get-ChildItem -LiteralPath $TargetDir -Directory -ErrorAction SilentlyContinue |
+      Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "release/pecofence.exe") -PathType Leaf } |
+      Select-Object -First 1
+    if ($triple) { $release = [IO.Path]::GetFullPath((Join-Path $triple.FullName "release")) }
+  }
   foreach ($exe in @("pecofence.exe", "pecofence-watchdog.exe", "pecofence-cli.exe")) {
     if (-not (Test-Path -LiteralPath (Join-Path $release $exe) -PathType Leaf)) {
       throw "Missing $exe in $release"

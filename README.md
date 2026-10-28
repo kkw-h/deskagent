@@ -71,6 +71,25 @@ powershell -File scripts/install.ps1
 
 配置在 `%APPDATA%\PecoFence\config.json`；`--portable` 则用 exe 旁边的 `config\`。
 
+### 打安装包
+
+```powershell
+powershell -File scripts/make-windows.ps1 -Format Installer -Repository kkw-h/deskagent `
+  -TargetDir C:/Users/<you>/cargo-target/package
+```
+
+产物是 `dist/pecofence-v0.2.3-x64-setup.exe`（附 `.sha256`），按用户安装、不需要管理员：
+文件放 `%LOCALAPPDATA%\Programs\PecoFence`，写卸载项和开始菜单快捷方式，卸载走
+「设置 → 应用」或目录里的 `unins000.exe`。
+
+需要 **Inno Setup 7** 的 `ISCC.exe`（`scripts/find-iscc.ps1` 会找
+`%LOCALAPPDATA%\Programs\Inno Setup 7`）。两个容易踩的点：
+
+- `-TargetDir` 要指向纯 ASCII 路径。仓库路径含中文时，宿主（GNU）编译 build script 用的
+  `ld` 处理不了，会报 `cannot open output file …\\<乱码>\\…`。
+- 安装包脚本只收 `dist` 里列出的文件；`WebView2Loader.dll` 和
+  `THIRD-PARTY-LICENSES.txt` 由 `make-windows.ps1` 现生成。
+
 ## DeskAgent 融入了什么
 
 不是把两个二进制放进一个仓库，而是三处实质性改动。
