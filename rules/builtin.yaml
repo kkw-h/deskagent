@@ -1,26 +1,41 @@
 # DeskAgent 内置分类规则包
 #
-# 匹配顺序：priority 从高到低，命中即停。
-# target_contains 比 company 精确（同一家公司可能出多种软件），所以优先级更高。
-# company / target_contains / name_contains 均为不区分大小写的子串匹配。
+# 匹配顺序：priority 从高到低，命中即停；同一规则内按 company → target → name → ext 顺序试。
+#
+# 三类信号的分工：
+#   target_contains  最强。指向安装目录，能区分同一厂商的不同产品。
+#   company          次强。但 Microsoft / Google 这类大厂名太泛，不能单独作为判据。
+#   name_contains    兜底。专治「多个快捷方式指向同一个宿主进程」的情况——
+#                    cmd.exe 和 powershell.exe 下挂着一堆开发工具入口，路径完全一样，
+#                    只有文件名能区分。
+#
+# 路径片段一律不写开头的反斜杠：`microsoft visual studio\installer` 里 "visual"
+# 前面是空格不是分隔符，写 `\visual studio\` 会漏。
 
 rules:
-  # ============ 游戏 ============
+  # ================================================================ 游戏
   - group: 游戏
     priority: 130
     match:
       target_contains:
+        - 'steam://'
+        - 'steamapps'
         - '\steam\'
         - '\steamtools\'
         - '\wegame\'
         - '\wegameapps\'
-        - '\epic games\'
-        - '\gameviewer\'
+        - '\epic games\launcher\'
         - '\battle.net\'
         - '\riot games\'
         - '\ubisoft\'
         - '\electronic arts\'
+        - '\ea app\'
         - '\gog galaxy\'
+        - '\itch\'
+        - '\hoyoplay\'
+        - '\mihoyo\'
+        - '\tencent\games\'
+        - '\netease\games\'
 
   - group: 游戏
     priority: 120
@@ -32,7 +47,8 @@ rules:
         - 'Riot Games'
         - 'Ubisoft'
         - 'Electronic Arts'
-        - 'Game Plus Plus'
+        - 'miHoYo'
+        - 'Cognosphere'
 
   - group: 游戏
     priority: 100
@@ -41,10 +57,15 @@ rules:
         - '英雄联盟'
         - '原神'
         - '崩坏'
+        - '绝区零'
         - '我的世界'
         - '双点'
+        - '黑神话'
+        - '赛博朋克'
+        - 'steam'
+        - 'wegame'
 
-  # ============ 浏览器 ============
+  # ================================================================ 浏览器
   - group: 浏览器
     priority: 130
     match:
@@ -53,33 +74,123 @@ rules:
         - '\microsoft\edge\'
         - '\mozilla firefox\'
         - '\bravesoftware\'
-        - '\quark\'
+        - '\quark'
+        - '\360se\'
+        - '\360chrome\'
+        - '\sogouexplorer\'
+        - '\opera\'
+        - '\vivaldi\'
+        - '\arc\'
 
   - group: 浏览器
-    priority: 110
+    priority: 120
     match:
       company:
         - 'Mozilla'
+        - 'Brave Software'
+        - 'The Quark Authors'
 
-  # ============ 开发 ============
+  - group: 浏览器
+    priority: 100
+    match:
+      name_contains:
+        - '浏览器'
+        - 'chrome'
+        - 'firefox'
+
+  # ================================================================ 开发
+  # 编辑器 / IDE
+  - group: 开发
+    priority: 135
+    match:
+      target_contains:
+        - '\microsoft vs code\'
+        - 'microsoft visual studio\'
+        - '\visual studio\'
+        - '\jetbrains\'
+        - '\intellij'
+        - '\pycharm'
+        - '\webstorm'
+        - '\goland'
+        - '\clion\'
+        - '\rider\'
+        - '\phpstorm'
+        - '\android studio'
+        - '\sublime text'
+        - '\notepad++'
+        - '\neovim\'
+        - '\cursor\'
+        - '\zed\'
+        - '\fleet\'
+        - '\eclipse\'
+        - '\electron\'
+        - 'node_modules\electron'
+
+  # 终端 / 版本控制 / 运行时 / SDK
+  - group: 开发
+    priority: 132
+    match:
+      target_contains:
+        - '\git\'
+        - '\github desktop\'
+        - '\sourcetree\'
+        - '\tortoisegit'
+        - '\nodejs\'
+        - '\nvm\'
+        - '\python\'
+        - '\anaconda'
+        - '\miniconda'
+        - '\java\'
+        - '\jdk'
+        - '\maven\'
+        - '\gradle\'
+        - '\rustup\'
+        - '\go\bin\'
+        - '\docker\'
+        - '\podman\'
+        - '\windows kits\'
+        - 'windowspowershell'
+        - '\android\sdk'
+        - '\cmder\'
+        - '\conemu\'
+        - '\alacritty\'
+        - '\wezterm\'
+        - '\tabby\'
+
+  # 虚拟化 / 远程调试 / 抓包 / 数据库客户端
   - group: 开发
     priority: 130
     match:
       target_contains:
-        - '\zed\'
-        - '\yaak\'
-        - '\jetbrains\'
-        - '\microsoft vs code\'
-        - '\visual studio\'
         - '\vmware\'
         - '\virtualbox\'
-        - '\git\'
-        - '\nodejs\'
-        - '\python\'
+        - '\qemu\'
+        - '\putty\'
+        - '\mobaxterm'
+        - '\xshell\'
+        - '\xftp\'
+        - '\finalshell'
+        - '\termius\'
+        - '\winscp\'
+        - '\filezilla\'
+        - '\postman\'
+        - '\apifox\'
+        - '\yaak\'
+        - '\insomnia\'
+        - '\wireshark\'
+        - '\fiddler\'
+        - '\charles\'
+        - '\navicat\'
+        - '\dbeaver\'
+        - '\heidisql\'
+        - '\pgadmin\'
+        - '\mongodb\'
+        - '\sysinternals\'
         - '\wechatwebdevtools\'
         - '微信web开发者工具'
         - '\workbuddy'
-        - '\docker\'
+        - '\unity\'
+        - '\unreal engine\'
 
   - group: 开发
     priority: 120
@@ -88,17 +199,47 @@ rules:
         - 'Zed Industries'
         - 'JetBrains'
         - 'VMware'
-        - 'GitHub'
+        - 'Docker'
         - 'Postman'
+        - 'Yaak'
+        - 'GitHub'
+        - 'Brecht Sanders'
+        - 'The Git Development Community'
+        - 'Python Software Foundation'
+        - 'Node.js'
+        - 'Eclipse Foundation'
+        - 'Sublime'
+        - 'Notepad++'
 
+  # 通用宿主补位：这些快捷方式指向 cmd.exe / powershell.exe，路径无区分度，只能看名字。
   - group: 开发
-    priority: 100
+    priority: 110
     match:
       name_contains:
-        - '开发者工具'
+        - 'command prompt'
+        - '命令提示符'
+        - 'powershell'
+        - 'terminal'
+        - 'git bash'
+        - 'git cmd'
+        - 'git gui'
         - 'developer'
+        - '开发者'
+        - 'development kit'
+        - 'sdk'
+        - 'verifier'
+        - 'visual studio'
+        - 'vs code'
+        - 'node.js'
+        - 'python'
+        - 'docker'
+        - 'ssh'
+        - '虚拟机'
+        - '调试'
+        - '数据库'
+        - '代码'
 
-  # ============ 社交 ============
+  # ================================================================ 社交
   - group: 社交
     priority: 130
     match:
@@ -109,6 +250,9 @@ rules:
         - '\telegram desktop\'
         - '\discord\'
         - '\slack\'
+        - '\whatsapp\'
+        - '\line\'
+        - '\signal\'
 
   - group: 社交
     priority: 120
@@ -116,19 +260,43 @@ rules:
       company:
         - 'Telegram'
         - 'Discord'
+        - 'Slack'
 
-  # ============ 影音 ============
+  - group: 社交
+    priority: 100
+    match:
+      name_contains:
+        - '微信'
+        - '企业微信'
+        - 'telegram'
+        - 'discord'
+        - 'whatsapp'
+
+  # ================================================================ 影音
   - group: 影音
     priority: 130
     match:
       target_contains:
         - '\potplayer\'
+        - '\daum\'
         - '\cloudmusic\'
         - '\bilibili\'
         - '\vlc\'
         - '\spotify\'
         - '\iqiyi\'
         - '\youku\'
+        - '\qqmusic\'
+        - '\kugou\'
+        - '\kuwo\'
+        - '\douyin\'
+        - '\kuaishou\'
+        - '\tencent video\'
+        - '\mpc-hc\'
+        - '\mpv\'
+        - '\foobar2000\'
+        - '\apple music\'
+        - '\itunes\'
+        - '\netflix\'
 
   - group: 影音
     priority: 120
@@ -137,6 +305,8 @@ rules:
         - 'Kakao'
         - 'VideoLAN'
         - 'Spotify'
+        - 'ByteDance'
+        - 'Beijing Microlive'
 
   - group: 影音
     priority: 100
@@ -145,8 +315,15 @@ rules:
         - '音乐'
         - '播放器'
         - '视频'
+        - '影视'
+        - '哔哩哔哩'
+        - '抖音'
+        - '快手'
+        - '爱奇艺'
+        - '优酷'
+        - '网易云'
 
-  # ============ 办公 ============
+  # ================================================================ 办公
   - group: 办公
     priority: 130
     match:
@@ -154,23 +331,37 @@ rules:
         - '\kingsoft\'
         - '\wps office\'
         - '\microsoft office\'
-        - '\feishu\'
         - '\doubao\'
+        - '\feishu\'
         - '\dingtalk\'
+        - '\wework\'
         - '\notion\'
         - '\obsidian\'
+        - '\typora\'
+        - '\onenote\'
+        - '\xmind\'
+        - '\adobe\acrobat'
+        - '\foxit\'
+        - '\kimi\'
+        - '\chatgpt\'
+        - '\claude\'
+        - '\yuque\'
+        - '\wpspdf\'
 
   - group: 办公
     priority: 120
     match:
       company:
         - 'Kingsoft'
+        - 'Zhuhai Kingsoft'
         - 'Feishu'
+        - 'Beijing Feishu'
         - 'Beijing Chuntian Zhiyun'
         - 'Notion Labs'
+        - 'Obsidian'
 
   - group: 办公
-    priority: 110
+    priority: 112
     match:
       ext:
         - '.doc'
@@ -180,8 +371,23 @@ rules:
         - '.ppt'
         - '.pptx'
         - '.pdf'
+        - '.csv'
+        - '.md'
 
-  # ============ 创作 ============
+  - group: 办公
+    priority: 100
+    match:
+      name_contains:
+        - 'office'
+        - '飞书'
+        - '钉钉'
+        - '豆包'
+        - '文档'
+        - '表格'
+        - '演示'
+        - '笔记'
+
+  # ================================================================ 创作
   - group: 创作
     priority: 130
     match:
@@ -191,6 +397,21 @@ rules:
         - '\figma\'
         - '\blender\'
         - '\davinci resolve\'
+        - '\capcut\'
+        - '\jianying\'
+        - '\剪映\'
+        - '\audacity\'
+        - '\sketchup\'
+        - '\autodesk\'
+        - '\autocad\'
+        - '\3ds max'
+        - '\maya\'
+        - '\cinema 4d\'
+        - '\affinity\'
+        - '\krita\'
+        - '\gimp\'
+        - '\inkscape\'
+        - '\aseprite\'
 
   - group: 创作
     priority: 110
@@ -202,22 +423,86 @@ rules:
         - '.fig'
         - '.blend'
         - '.prproj'
+        - '.aep'
+        - '.dwg'
+        - '.c4d'
 
-  # ============ 工具 ============
+  - group: 创作
+    priority: 100
+    match:
+      name_contains:
+        - '剪映'
+        - 'capcut'
+        - 'photoshop'
+        - 'premiere'
+        - 'after effects'
+        - 'illustrator'
+        - '录屏'
+        - '剪辑'
+
+  # ================================================================ 工具
+  # 网络代理 / 加速 / 远程控制
+  - group: 工具
+    priority: 132
+    match:
+      target_contains:
+        - '\clash'
+        - '\v2ray'
+        - '\nekoray'
+        - '\singbox'
+        - '\sing-box'
+        - '\wireguard'
+        - '\tailscale'
+        - '\todesk\'
+        - '\sunlogin'
+        - '\anydesk\'
+        - '\teamviewer\'
+        - '\rustdesk\'
+        - '\parsec\'
+        - '\leigod'
+        - '\gameviewer\'
+        - '\pccontinuity\'
+        - '\ugreen\'
+        - '\deskflow\'
+        - '\synergy\'
+
+  # 压缩 / 下载 / 系统增强 / 驱动 / 硬件配套
   - group: 工具
     priority: 130
     match:
       target_contains:
-        - '\clash'
-        - '\todesk\'
-        - '\quicklook\'
-        - '\nvidia'
-        - '\leigod'
-        - '\sciland\'
-        - '\pccontinuity\'
         - '\7-zip\'
+        - '\7zip\'
         - '\winrar\'
+        - '\bandizip\'
+        - '\2345explorer'
         - '\everything\'
+        - '\powertoys\'
+        - '\quicklook'
+        - '\nvidia'
+        - '\amd\'
+        - '\intel\'
+        - '\realtek\'
+        - '\lghub\'
+        - '\razer\'
+        - '\corsair\'
+        - '\logitech\'
+        - '\yubico\'
+        - '\idm\'
+        - '\thunder\'
+        - '\qbittorrent\'
+        - '\bitcomet\'
+        - '\aria2\'
+        - '\huorong\'
+        - '\360safe\'
+        - '\qqpcmgr\'
+        - '\ccleaner\'
+        - '\dism++\'
+        - '\geek uninstaller\'
+        - '\snipaste\'
+        - '\sharex\'
+        - '\sciland\'
+        - '\gamepplite\'
 
   - group: 工具
     priority: 120
@@ -228,6 +513,23 @@ rules:
         - 'pooi.moe'
         - 'Sciland'
         - 'MiPcContinuity'
+        - 'Deskflow'
+        - 'Logitech'
+        - 'Yubico'
+        - 'Igor Pavlov'
+        - 'RarLab'
+        - 'voidtools'
+        - 'Game Plus Plus'
+        - 'Apple Inc.'
+
+  # 输入法归工具，不归办公：豆包输入法、搜狗输入法都带着「办公厂商」的公司名，
+  # 靠公司名会误判，必须用产品类型先截住，所以优先级要高于办公的公司名规则。
+  - group: 工具
+    priority: 125
+    match:
+      name_contains:
+        - '输入法'
+        - 'input method'
 
   - group: 工具
     priority: 100
@@ -236,3 +538,33 @@ rules:
         - '加速器'
         - '远程'
         - '助手'
+        - '驱动'
+        - '安全'
+        - '杀毒'
+        - '压缩'
+        - '解压'
+        - '管家'
+        - '卸载'
+        - '清理'
+        - '优化'
+
+  # ================================================================ 系统
+  # 桌面上常见的系统入口多为 CLSID 链接（无 target），只能靠名字。
+  - group: 系统
+    priority: 90
+    match:
+      name_contains:
+        - '控制面板'
+        - '回收站'
+        - '此电脑'
+        - '我的电脑'
+        - '任务管理器'
+        - '注册表'
+        - '设备管理器'
+        - '磁盘管理'
+        - '事件查看器'
+        - '系统配置'
+        - '系统信息'
+        - '计算机管理'
+        - '资源监视器'
+        - '网络连接'

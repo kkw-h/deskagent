@@ -1,0 +1,46 @@
+# 留出集抽查标注：只标了能确定答案的条目，其余仅看覆盖率
+labels:
+  "7-Zip 25.01 (x64)": 工具
+  "Bonjour": 工具
+  "Clash Verge": 工具
+  "Deskflow": 工具
+  "Epic Games Launcher": 游戏
+  "Git": 开发
+  "GitHub CLI": 开发
+  "Google Chrome": 浏览器
+  "Logitech G HUB": 工具
+  "Microsoft Edge": 浏览器
+  "Microsoft Visual Studio Installer": 开发
+  "Node.js": 开发
+  "NVIDIA App 11.0.8.244": 工具
+  "OBS Studio": 创作
+  "PotPlayer-64 bit": 影音
+  "QQ": 社交
+  "QuickLook": 工具
+  "Sciland 0.1.243": 工具
+  "Steam": 游戏
+  "Telegram Desktop": 社交
+  "ToDesk": 工具
+  "UU远程": 工具
+  "Visual Studio 生成工具 2022": 开发
+  "VMware Workstation": 开发
+  "WeGame": 游戏
+  "WorkBuddy AI 5.8.4": 开发
+  "WPS Office (12.1.0.28505)": 办公
+  "Yaak": 开发
+  "Yubico Authenticator": 工具
+  "Zed": 开发
+  "双点博物馆": 游戏
+  "哔哩哔哩": 影音
+  "夸克": 浏览器
+  "小米互联服务": 工具
+  "微信": 社交
+  "微信开发者工具 2.01.2510260": 开发
+  "抖音": 影音
+  "游戏加加轻量版": 工具
+  "网易云音乐": 影音
+  "英雄联盟": 游戏
+  "豆包": 办公
+  "豆包输入法": 工具
+  "雷神加速器": 工具
+  "飞书": 办公

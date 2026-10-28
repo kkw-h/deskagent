@@ -43,6 +43,7 @@ PecoFence 的规则引擎是**属性驱动**的，不是语义驱动的。所以
 ## 文档
 
 - [PRD.md](PRD.md) — 产品规划 v1.0（转向版）
+- [评测报告.md](评测报告.md) — 规则包在三个数据集上的实测结果与局限
 - [竞品与技术调研.md](竞品与技术调研.md) — 14 个开源竞品与三条技术路线
 - [产品方案.html](产品方案.html) — 可视化方案概览
 
@@ -52,27 +53,47 @@ Rust CLI。
 
 ```
 crates/scan       桌面枚举 + .lnk 深解析 + PE 版本信息
-crates/classify   规则引擎 + LLM 客户端 + 置信度
-crates/compile    分类结果 → PecoFence 指令
-crates/pecofence  pecofence-cli 适配层
+crates/classify   规则引擎 + 置信度
+crates/compile    分类结果 → PecoFence 指令（M2）
+crates/pecofence  pecofence-cli 适配层（M1）
 crates/storage    SQLite（历史、学习规则、缓存）
 crates/cli        命令行入口
 ```
 
-`.lnk` 用纯 Rust 解析（`lnk` crate），不依赖 COM。`windows` crate 只用于 PE 版本信息、签名验证、注册表读桌面路径。
+`.lnk` 与 PE 版本信息都是纯 Rust 解析，不依赖 COM，也不需要 `windows` crate。
+这样能用 GNU 工具链构建，不必装 3GB 的 MSVC。
 
 ## 状态
 
-规划完成，待开工。约 6 周（单人，含验证）。
+M0 已完成。当前可用命令：
+
+```bash
+deskagent scan                    # 扫桌面，列出条目与元数据覆盖
+deskagent classify                # 扫桌面并分类
+deskagent eval --dir <DIR> --labels <YAML> --split all
+deskagent classify-json --input <JSON>   # 分类外部条目（注册表、清单文件）
+```
+
+实测（详见 [评测报告.md](评测报告.md)）：
+
+| 数据集 | 覆盖率 | 准确率 |
+|---|---|---|
+| 桌面（37，调优集） | 97% | — |
+| 开始菜单（70，独立来源） | 100%※ | 100%※ |
+| 注册表安装程序（53，独立来源） | 96% | 100% |
+
+※ 该数据集已参与调优，数字不可引用。可引用的干净估计是 86%–96%。
 
 | 阶段 | 交付 | 通过条件 | 状态 |
 |---|---|---|---|
-| M0 | scan + classify，只输出方案 | 难点样本全部正确，准确率 ≥80% | 未开始 |
+| M0 | scan + classify，只输出方案 | 难点样本全部正确，准确率 ≥80% | 已完成 |
 | M1 | 落地到 PecoFence | 一条命令完成布局，快照可回滚 | 未开始 |
 | M2 | 规则编译 + 增量守护 | 新图标 5 秒内归位建议 | 未开始 |
 | M3 | LLM 双模式 + 评测 | 操作数比手写规则低 50% | 未开始 |
 
-**生死线**：AI 分类是否真的比手写规则省事。M0 必须先回答，不达标就停。
+**生死线**：AI 分类是否真的比手写规则省事。M0 测出瓶颈在覆盖率（70% → 96%），
+但「AI 比手写规则省事」这个对照实验还没做——手写规则目前覆盖 96%，
+LLM 的价值只剩下「剩下 4% + 未知软件」。这个判断要等 M3 的数据。
 
 ## 历史
 

@@ -30,3 +30,6 @@ desktop.ini
 # 环境变量
 .env
 .env.local
+
+# 评测用生成数据（可脚本重建）
+eval/*.json

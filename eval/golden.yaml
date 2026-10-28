@@ -1,0 +1,103 @@
+# 评测集：开始菜单里的真实应用快捷方式
+#
+# 来源：C:\ProgramData\...\Start Menu\Programs + %APPDATA%\...\Start Menu\Programs
+# 这批样本从未参与内置规则包的编写，是独立的泛化测试集。
+#
+# 筛选口径（三条，都是为了让指标反映「桌面上的真实情况」）：
+#   1. 只保留 target 非空的条目。桌面上的 .lnk 一定有目标路径；
+#      开始菜单里 target 为空的多是 shell: 或 ::{CLSID} 链接（控制面板、任务管理器等），
+#      属于另一种数据结构，混进来会把「解析能力缺口」算成「分类错误」。
+#   2. 剔除卸载 / 帮助 / 文档 / 官网 / 反馈类条目。这些只存在于开始菜单，
+#      桌面上不会出现，且分组归属本身没有客观答案。
+#   3. 剔除无法识别的条目（GX.lnk 指向 D:\GX，无法判断是什么）。
+#
+# 分组口径：
+#   开发  = 编程、命令行、虚拟化、SDK、API 调试
+#   工具  = 系统增强、压缩、驱动、远程、加速器、硬件配套
+#   影音  = 音视频播放与内容平台
+#   办公  = 文档协作、办公套件、AI 助手
+#   创作  = 音视频/图形生产工具
+#   社交  = 即时通讯
+#   游戏  = 游戏平台与游戏本体
+#   浏览器 = 网页浏览器
+
+labels:
+  # ---- 工具 ----
+  7-Zip.lnk: 工具
+  7-Zip File Manager.lnk: 工具
+  Clash Verge.lnk: 工具
+  Deskflow.lnk: 工具
+  Logitech G HUB.lnk: 工具
+  NVIDIA App.lnk: 工具
+  QuickLook.lnk: 工具
+  Sciland.lnk: 工具
+  ToDesk.lnk: 工具
+  UU远程.lnk: 工具
+  Yubico Authenticator.lnk: 工具
+  小米互联服务.lnk: 工具
+  游戏加加轻量版.lnk: 工具
+  雷神加速器.lnk: 工具
+
+  # ---- 浏览器 ----
+  Google Chrome.lnk: 浏览器
+  Microsoft Edge.lnk: 浏览器
+  夸克.lnk: 浏览器
+
+  # ---- 开发 ----
+  Application Verifier (WOW).lnk: 开发
+  Application Verifier (X64).lnk: 开发
+  Debuggable Package Manager.lnk: 开发
+  Developer Command Prompt for VS 2022.lnk: 开发
+  Developer PowerShell for VS 2022.lnk: 开发
+  Electron.lnk: 开发
+  Git Bash.lnk: 开发
+  Git CMD.lnk: 开发
+  Git GUI.lnk: 开发
+  Install Additional Tools for Node.js.lnk: 开发
+  Node.js.lnk: 开发
+  Node.js command prompt.lnk: 开发
+  VMware Workstation 17 Player.lnk: 开发
+  VMware Workstation Pro.lnk: 开发
+  Visual Studio Installer.lnk: 开发
+  Windows App Cert Kit.lnk: 开发
+  Windows PowerShell.lnk: 开发
+  Windows PowerShell (x86).lnk: 开发
+  Windows Software Development Kit.lnk: 开发
+  WorkBuddy AI.lnk: 开发
+  Yaak.lnk: 开发
+  Zed.lnk: 开发
+  vctl 的命令提示符.lnk: 开发
+  x64 Native Tools Command Prompt for VS 2022.lnk: 开发
+  x64_x86 Cross Tools Command Prompt for VS 2022.lnk: 开发
+  x86 Native Tools Command Prompt for VS 2022.lnk: 开发
+  x86_x64 Cross Tools Command Prompt for VS 2022.lnk: 开发
+  微信开发者工具.lnk: 开发
+  虚拟网络编辑器.lnk: 开发
+
+  # ---- 社交 ----
+  QQ.lnk: 社交
+  Telegram.lnk: 社交
+  微信.lnk: 社交
+
+  # ---- 影音 ----
+  PotPlayer 64 bit.lnk: 影音
+  哔哩哔哩.lnk: 影音
+  抖音.lnk: 影音
+  网易云音乐.lnk: 影音
+
+  # ---- 办公 ----
+  WPS Office.lnk: 办公
+  豆包.lnk: 办公
+  配置工具.lnk: 办公
+  飞书.lnk: 办公
+
+  # ---- 创作 ----
+  OBS Studio (64bit).lnk: 创作
+
+  # ---- 游戏 ----
+  Epic Games Launcher.lnk: 游戏
+  Steam.lnk: 游戏
+  WeGame.lnk: 游戏
+  双点博物馆.url: 游戏
+  双点校园.url: 游戏
+  英雄联盟WeGame版.lnk: 游戏
