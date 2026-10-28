@@ -193,6 +193,34 @@ rules:
         - '\unreal engine\'
 
   - group: 开发
+    priority: 108
+    match:
+      ext:
+        - '.py'
+        - '.js'
+        - '.ts'
+        - '.tsx'
+        - '.jsx'
+        - '.rs'
+        - '.go'
+        - '.java'
+        - '.c'
+        - '.h'
+        - '.cpp'
+        - '.hpp'
+        - '.cs'
+        - '.rb'
+        - '.php'
+        - '.sh'
+        - '.ps1'
+        - '.sql'
+        - '.json'
+        - '.yaml'
+        - '.yml'
+        - '.toml'
+        - '.ipynb'
+
+  - group: 开发
     priority: 120
     match:
       company:
@@ -307,6 +335,24 @@ rules:
         - 'Spotify'
         - 'ByteDance'
         - 'Beijing Microlive'
+
+  - group: 影音
+    priority: 112
+    match:
+      ext:
+        - '.mp4'
+        - '.mkv'
+        - '.avi'
+        - '.mov'
+        - '.flv'
+        - '.wmv'
+        - '.webm'
+        - '.mp3'
+        - '.flac'
+        - '.wav'
+        - '.m4a'
+        - '.aac'
+        - '.ogg'
 
   - group: 影音
     priority: 100

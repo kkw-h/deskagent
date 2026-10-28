@@ -7,3 +7,4 @@ license.workspace = true
 [dependencies]
 deskagent-classify = { path = "../classify" }
 serde.workspace = true
+serde_json.workspace = true

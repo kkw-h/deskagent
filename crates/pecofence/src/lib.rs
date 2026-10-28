@@ -152,6 +152,16 @@ impl Cli {
     pub fn add_ext_rule(&self, name: &str, to: &str, exts: &[String]) -> Result<serde_json::Value> {
         self.call(&cmd_rule_add_ext(name, to, exts))
     }
+
+    pub fn list_rules(&self) -> Result<serde_json::Value> {
+        self.call(&cmd_rule_list())
+    }
+
+    /// 阻塞到桌面上出现一个新条目，返回该事件。
+    /// 用于增量守护：一次等一个，处理完再等下一个。
+    pub fn watch_inbox_once(&self) -> Result<serde_json::Value> {
+        self.call(&cmd_watch_inbox_once())
+    }
 }
 
 // ---------------------------------------------------------------- 参数拼装
@@ -213,16 +223,40 @@ pub fn cmd_item_move(paths: &[String], to: &str, dry_run: bool) -> Vec<String> {
 
 /// PecoFence 的规则条件只认扩展名/类型/文件名等属性，没有公司名和目标路径，
 /// 所以只有「扩展名 → 分组」这类判断能沉淀成持久规则，其余只能一次性移动。
+///
+/// 注意扩展名不带点：文档里的写法是 `--ext pdf,docx`，不是 `.pdf`。
+/// 调用方通常拿的是带点的扩展名，这里统一剥掉。
 pub fn cmd_rule_add_ext(name: &str, to: &str, exts: &[String]) -> Vec<String> {
+    let joined = exts
+        .iter()
+        .map(|e| e.trim_start_matches('.').to_string())
+        .collect::<Vec<_>>()
+        .join(",");
     vec![
         "rule".into(),
         "add".into(),
         "--name".into(),
         name.into(),
         "--ext".into(),
-        exts.join(","),
+        joined,
         "--to".into(),
         to.into(),
+    ]
+}
+
+pub fn cmd_rule_list() -> Vec<String> {
+    vec!["rule".into(), "list".into()]
+}
+
+/// `watch --once` 阻塞到有事件才退出，正好当「等一个新图标」用。
+pub fn cmd_watch_inbox_once() -> Vec<String> {
+    vec![
+        "watch".into(),
+        "--fence".into(),
+        "inbox".into(),
+        "--events".into(),
+        "item.added".into(),
+        "--once".into(),
     ]
 }
 
@@ -333,6 +367,23 @@ mod tests {
         let exts = vec!["pdf".to_string(), "docx".to_string()];
         let a = cmd_rule_add_ext("文档", "办公", &exts);
         assert_eq!(a[5], "pdf,docx");
+    }
+
+    /// 我们内部的扩展名都带点，PecoFence 的 --ext 不带点。
+    #[test]
+    fn ext_rule_strips_leading_dot() {
+        let exts = vec![".pdf".to_string(), ".docx".to_string()];
+        let a = cmd_rule_add_ext("deskagent-办公", "办公", &exts);
+        assert_eq!(a[5], "pdf,docx");
+    }
+
+    #[test]
+    fn watch_once_targets_inbox_added_events() {
+        let a = cmd_watch_inbox_once();
+        assert_eq!(a[0], "watch");
+        assert!(a.contains(&"inbox".to_string()));
+        assert!(a.contains(&"item.added".to_string()));
+        assert_eq!(a.last().unwrap(), "--once");
     }
 
     #[test]

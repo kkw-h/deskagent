@@ -81,6 +81,21 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// 推导可以沉淀成 PecoFence 持久规则的扩展名规则
+    Rules {
+        /// 扫描指定目录，可重复；缺省时扫桌面
+        #[arg(long, value_name = "DIR")]
+        dir: Vec<PathBuf>,
+        /// 以 JSON 输出
+        #[arg(long)]
+        json: bool,
+    },
+    /// 增量守护：桌面出现新图标就分类并归位
+    Watch {
+        /// 处理一个事件就退出，便于脚本循环调用
+        #[arg(long)]
+        once: bool,
+    },
     /// 把方案落地到 PecoFence
     Apply {
         /// 扫描指定目录，可重复；缺省时扫桌面
@@ -92,6 +107,9 @@ enum Cmd {
         /// 覆盖自动探测的工作区，格式 x,y,w,h（物理像素，虚拟屏坐标）
         #[arg(long, value_name = "RECT")]
         area: Option<String>,
+        /// 同时把扩展名类判断沉淀成 PecoFence 持久规则
+        #[arg(long)]
+        with_rules: bool,
         /// 只演示，不修改任何东西
         #[arg(long)]
         dry_run: bool,
@@ -133,9 +151,12 @@ fn main() -> anyhow::Result<()> {
             dir,
             min_items,
             area,
+            with_rules,
             dry_run,
             yes,
-        } => apply(&dir, min_items, area.as_deref(), dry_run, yes),
+        } => apply(&dir, min_items, area.as_deref(), with_rules, dry_run, yes),
+        Cmd::Rules { dir, json } => rules(&dir, json),
+        Cmd::Watch { once } => watch(once),
     }
 }
 
@@ -199,10 +220,203 @@ fn file_label(path: &str) -> String {
     path.rsplit(['\\', '/']).next().unwrap_or(path).to_string()
 }
 
+// ---------------------------------------------------------------- 规则编译
+
+fn rules(dirs: &[PathBuf], json: bool) -> anyhow::Result<()> {
+    let items = collect(dirs)?;
+    let pack = RulePack::from_yaml(BUILTIN_RULES)?;
+    let c = compile::rules::compile_ext_rules(&items, &pack);
+
+    if json {
+        let payload = serde_json::json!({
+            "rules": c.rules.iter().map(|r| serde_json::json!({
+                "name": r.name(),
+                "group": r.group,
+                "exts": r.exts,
+            })).collect::<Vec<_>>(),
+            "conflicts": c.conflicts.iter().map(|x| serde_json::json!({
+                "ext": x.ext,
+                "groups": x.groups.iter().map(|(g, n)| serde_json::json!({
+                    "group": g, "count": n,
+                })).collect::<Vec<_>>(),
+            })).collect::<Vec<_>>(),
+            "skipped_semantic": c.skipped_semantic,
+        });
+        println!("{}", serde_json::to_string_pretty(&payload)?);
+        return Ok(());
+    }
+
+    print_rules(&c);
+    Ok(())
+}
+
+fn print_rules(c: &compile::rules::Compiled) {
+    println!("可沉淀成持久规则的扩展名：{}", c.rules.len());
+    println!("{}", "-".repeat(76));
+    for r in &c.rules {
+        println!(
+            "{:<24} {} → {}",
+            r.name(),
+            r.exts.join(" "),
+            r.group
+        );
+    }
+    if !c.conflicts.is_empty() {
+        println!("{}", "-".repeat(76));
+        println!("不编译（同一扩展名落在多个分组，本身不携带分类信息）");
+        for x in &c.conflicts {
+            let detail = x
+                .groups
+                .iter()
+                .map(|(g, n)| format!("{g}×{n}"))
+                .collect::<Vec<_>>()
+                .join("、");
+            println!("    {:<8} {detail}", x.ext);
+        }
+    }
+    if c.skipped_semantic > 0 {
+        println!("{}", "-".repeat(76));
+        println!(
+            "{} 个条目（快捷方式等）靠语义判断，无法表达成 PecoFence 规则，只能一次性移动。",
+            c.skipped_semantic
+        );
+        println!("这部分的新增图标要靠 `deskagent watch` 守护。");
+    }
+}
+
+/// 安装规则。只能给**已存在**的栅栏装，否则 PecoFence 会报 `fence_not_found`。
+fn install_rules(cli: &pecofence::Cli, dirs: &[PathBuf], allowed: &[String]) -> anyhow::Result<()> {
+    let items = collect(dirs)?;
+    let pack = RulePack::from_yaml(BUILTIN_RULES)?;
+    let c = compile::rules::compile_ext_rules(&items, &pack);
+
+    let usable: Vec<&compile::rules::ExtRule> = c
+        .rules
+        .iter()
+        .filter(|r| allowed.contains(&r.group))
+        .collect();
+    if usable.is_empty() {
+        println!("\n没有可安装的扩展名规则。");
+        return Ok(());
+    }
+
+    let list = cli.list_rules()?;
+    let existing = compile::rules::existing_rule_names(&list);
+    let keep_updated = compile::rules::keep_updated(&list);
+
+    println!("\n安装扩展名规则：");
+    let mut added = 0usize;
+    for r in usable {
+        let name = r.name();
+        if existing.contains(&name) {
+            println!("    「{name}」已存在，跳过");
+            continue;
+        }
+        match cli.add_ext_rule(&name, &r.group, &r.exts) {
+            Ok(_) => {
+                println!("    已添加 {name}：{} → {}", r.ext_arg(), r.group);
+                added += 1;
+            }
+            Err(e) => eprintln!("    添加 {name} 失败：{e}"),
+        }
+    }
+
+    if added > 0 && !keep_updated {
+        // 这条提示很关键：规则装了但自动归档关着，用户会以为没生效
+        println!(
+            "    注意：PecoFence 的「新条目自动归档」（keepUpdated）当前是关闭的，\n\
+             扩展名规则不会自动生效。请在 PecoFence 设置里打开，或让 `deskagent watch` 常驻。"
+        );
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------- 增量守护
+
+fn watch(once: bool) -> anyhow::Result<()> {
+    let cli = pecofence::Cli::discover()?;
+    let pack = RulePack::from_yaml(BUILTIN_RULES)?;
+
+    // 先确认应用在运行，否则 watch 会一直阻塞在连接上
+    cli.status().map_err(|e| match e {
+        pecofence::Error::NotRunning => anyhow::anyhow!("PecoFence 没有在运行，请先启动它"),
+        other => anyhow::anyhow!(other),
+    })?;
+
+    println!("增量守护已启动。桌面出现新图标时自动分类归位，Ctrl+C 退出。");
+    if once {
+        println!("（--once：处理一个事件后退出）");
+    }
+
+    loop {
+        let event = match cli.watch_inbox_once() {
+            Ok(v) => v,
+            Err(e) => {
+                // 应用退出或超时都会到这里。once 模式直接失败，常驻模式退避重试
+                if once {
+                    return Err(e.into());
+                }
+                eprintln!("等待事件失败：{e}，2 秒后重试");
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                continue;
+            }
+        };
+
+        handle_event(&cli, &pack, &event);
+
+        if once {
+            return Ok(());
+        }
+    }
+}
+
+/// 处理一个 `item.added` 事件：重新采集元数据 → 分类 → 移到对应栅栏。
+fn handle_event(cli: &pecofence::Cli, pack: &RulePack, event: &serde_json::Value) {
+    let Some(path) = event
+        .get("item")
+        .and_then(|i| i.get("path"))
+        .and_then(|p| p.as_str())
+    else {
+        // shell 命名空间条目（此电脑、回收站）没有路径，跳过
+        return;
+    };
+
+    let p = Path::new(path);
+    if !p.is_file() {
+        return;
+    }
+    let Some(item) = to_item(p) else {
+        return;
+    };
+
+    let Some((group, reason)) = pack.classify(&item) else {
+        println!("{}：规则包未覆盖，留在桌面", item.name);
+        return;
+    };
+
+    let fences = match cli.list_fences() {
+        Ok(v) => pecofence::reusable_titles(&v),
+        Err(e) => {
+            eprintln!("读取栅栏列表失败：{e}");
+            return;
+        }
+    };
+    if !fences.contains(&group) {
+        println!("{} → {group}（还没有这个栅栏，留在桌面）", item.name);
+        return;
+    }
+
+    match cli.move_items(&[item.path.clone()], &group, false) {
+        Ok(_) => println!("{} → {group}（{reason}）", item.name),
+        Err(e) => eprintln!("{} 归位失败：{e}", item.name),
+    }
+}
+
 fn apply(
     dirs: &[PathBuf],
     min_items: usize,
     area_override: Option<&str>,
+    with_rules: bool,
     dry_run: bool,
     yes: bool,
 ) -> anyhow::Result<()> {
@@ -243,6 +457,22 @@ fn apply(
                 rects[i].to_arg()
             );
             println!("    item move <{} 项> --to {}", f.count(), f.title);
+        }
+        if with_rules {
+            let items = collect(dirs)?;
+            let pack = RulePack::from_yaml(BUILTIN_RULES)?;
+            let c = compile::rules::compile_ext_rules(&items, &pack);
+            if c.rules.is_empty() {
+                println!("    （没有可编译的扩展名规则）");
+            }
+            for r in &c.rules {
+                println!(
+                    "    rule add --name {} --ext {} --to {}",
+                    r.name(),
+                    r.ext_arg(),
+                    r.group
+                );
+            }
         }
         println!("\n注意：item move 会改变图标所属栅栏，确认无误再加 --yes。");
         return Ok(());
@@ -342,6 +572,16 @@ fn apply(
             );
         }
         println!("不满意可以回滚布局：pecofence-cli snapshot restore {snap_id}");
+
+        if with_rules {
+            let allowed: Vec<String> = p
+                .fences
+                .iter()
+                .map(|f| f.title.clone())
+                .filter(|t| !blocked_groups.contains(t))
+                .collect();
+            install_rules(&cli, dirs, &allowed)?;
+        }
         Ok(())
     } else {
         anyhow::bail!("{failures} 个栅栏搬运失败，布局快照 {snap_id} 可用于回滚")
@@ -743,40 +983,54 @@ fn walk(dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
     Ok(out)
 }
 
-/// 单个文件转成条目；非快捷方式返回 None。
+/// 单个文件转成条目。
+///
+/// 不只处理快捷方式：真实桌面上一定有 PDF、图片、压缩包。早先只收 `.lnk`/`.url`，
+/// 结果 `rules` 在只有快捷方式的机器上永远推不出扩展名规则，掩盖了这条通路。
 fn to_item(path: &Path) -> Option<Item> {
-    let ext = path
-        .extension()
-        .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
-        .unwrap_or_default();
-    if ext != ".lnk" && ext != ".url" {
-        return None;
-    }
-
     let file_name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    // shell 的目录元数据文件，不是用户内容
+    if file_name.eq_ignore_ascii_case("desktop.ini") {
+        return None;
+    }
+
+    let ext = path
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
         .unwrap_or_default();
     let name = path
         .file_stem()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
 
-    let target = if ext == ".lnk" {
-        deskagent_scan::parse_file(path)
+    // 目标路径的含义：快捷方式指它指向的文件，普通文件指它自己
+    let target = match ext.as_str() {
+        ".lnk" => deskagent_scan::parse_file(path)
             .map(|i| i.target)
-            .unwrap_or_default()
-    } else {
-        read_url_target(path).unwrap_or_default()
+            .unwrap_or_default(),
+        ".url" => read_url_target(path).unwrap_or_default(),
+        _ => path.to_string_lossy().into_owned(),
     };
 
     // LNK 里的路径常带 `..`（如 `C:\Program Files\bilibili\..\Program Files\...`），
     // 不规范化会导致文件探测失败、读不到版本信息。
     let resolved = normalize(&target);
-    let pe = resolved
-        .as_deref()
-        .filter(|p| Path::new(p).is_file())
-        .and_then(deskagent_scan::read_version);
+    let pe_source = match ext.as_str() {
+        ".lnk" => resolved
+            .as_deref()
+            .filter(|p| Path::new(p).is_file())
+            .map(PathBuf::from),
+        // 可执行文件本身带版本信息
+        ".exe" | ".dll" => Some(path.to_path_buf()),
+        _ => None,
+    };
+    let pe = pe_source.and_then(|p| {
+        let s = p.to_string_lossy().into_owned();
+        deskagent_scan::read_version(&s)
+    });
 
     Some(Item {
         name,

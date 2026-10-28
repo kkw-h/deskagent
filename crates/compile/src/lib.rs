@@ -10,6 +10,8 @@
 
 use std::collections::BTreeMap;
 
+pub mod rules;
+
 use deskagent_classify::{Item, RulePack};
 
 /// 分组优先级：决定栅栏的摆放顺序。
