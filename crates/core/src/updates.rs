@@ -4,7 +4,7 @@
 
 use serde::Deserialize;
 
-pub const REPOSITORY: &str = "DayuanJiang/PecoFence";
+pub const REPOSITORY: &str = "kkw-h/deskagent";
 
 /// GitHub's newest published release; drafts and prereleases are never "latest".
 pub fn latest_release_url() -> String {
@@ -110,7 +110,10 @@ pub fn is_newer(candidate: &str, current: &str) -> bool {
 mod tests {
     use super::*;
 
-    const BASE: &str = "https://github.com/DayuanJiang/PecoFence/releases/download/";
+    // Derived, so repointing `REPOSITORY` does not need edits here.
+    fn base() -> String {
+        super::download_base()
+    }
 
     fn release_json(tag: &str, assets: &[(&str, &str)]) -> String {
         let assets: Vec<_> = assets
@@ -148,7 +151,7 @@ mod tests {
 
     #[test]
     fn picks_the_setup_from_this_repository() {
-        let exe = format!("{BASE}v0.1.4/pecofence-v0.1.4-x64-setup.exe");
+        let exe = format!("{}v0.1.4/pecofence-v0.1.4-x64-setup.exe", base());
         let json = release_json(
             "v0.1.4",
             &[
@@ -159,12 +162,12 @@ mod tests {
                 ("pecofence-v0.1.4-x64-setup.exe", &exe),
             ],
         );
-        let release = parse_release(&json, BASE).unwrap();
+        let release = parse_release(&json, &base()).unwrap();
         assert_eq!(release.version, "0.1.4");
         // Not the response's html_url: that is never opened.
         assert_eq!(
             release.page,
-            "https://github.com/DayuanJiang/PecoFence/releases/tag/v0.1.4"
+            format!("https://github.com/{REPOSITORY}/releases/tag/v0.1.4")
         );
         assert_eq!(
             release.setup,
@@ -178,7 +181,7 @@ mod tests {
     #[test]
     fn a_setup_from_elsewhere_is_not_offered() {
         assert_eq!(
-            parse_release(&release_json("v0.1.4", &[]), BASE)
+            parse_release(&release_json("v0.1.4", &[]), &base())
                 .unwrap()
                 .setup,
             None
@@ -190,8 +193,8 @@ mod tests {
                 "https://example.invalid/setup.exe",
             )],
         );
-        assert_eq!(parse_release(&elsewhere, BASE).unwrap().setup, None);
-        let escaping = format!("{BASE}../../../other/repo/releases/download/v0.1.4/");
+        assert_eq!(parse_release(&elsewhere, &base()).unwrap().setup, None);
+        let escaping = format!("{}../../../other/repo/releases/download/v0.1.4/", base());
         let climbing = release_json(
             "v0.1.4",
             &[(
@@ -199,8 +202,8 @@ mod tests {
                 &format!("{escaping}pecofence-v0.1.4-x64-setup.exe"),
             )],
         );
-        assert_eq!(parse_release(&climbing, BASE).unwrap().setup, None);
-        assert!(parse_release(&release_json("nightly", &[]), BASE).is_err());
-        assert!(parse_release("not json", BASE).is_err());
+        assert_eq!(parse_release(&climbing, &base()).unwrap().setup, None);
+        assert!(parse_release(&release_json("nightly", &[]), &base()).is_err());
+        assert!(parse_release("not json", &base()).is_err());
     }
 }
