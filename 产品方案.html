@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DeskAgent · 产品方案 v0.3</title>
+<title>DeskAgent · 产品方案 v1.0</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body {
@@ -11,7 +11,7 @@
     background:#FAFAF8; color:#1F1F1D; line-height:1.7; font-size:14px;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap { max-width:980px; margin:0 auto; padding:56px 32px 80px; }
+  .wrap { max-width:960px; margin:0 auto; padding:56px 32px 80px; }
 
   header { border-bottom:1px solid #E5E3DC; padding-bottom:32px; margin-bottom:44px; }
   .eyebrow { font-size:12px; letter-spacing:.08em; color:#888780; text-transform:uppercase; margin-bottom:14px; }
@@ -30,47 +30,62 @@
   td.n { color:#888780; width:32px; }
   .yes { color:#0F6E56; font-weight:600; }
   .no { color:#A32D2D; font-weight:600; }
-  .mid { color:#854F0B; font-weight:600; }
 
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   .panel { background:#fff; border:1px solid #E5E3DC; border-radius:12px; padding:22px; }
-  .panel h3 { font-size:14px; font-weight:600; margin-bottom:6px; }
-  .panel .sub { font-size:12px; color:#888780; margin-bottom:14px; }
-  .panel ul { list-style:none; }
-  .panel li { font-size:13px; color:#5F5E5A; padding:6px 0 6px 16px; position:relative; }
-  .panel li::before { content:""; position:absolute; left:0; top:14px; width:5px; height:5px; border-radius:50%; background:#CECBF6; }
-  .panel li b { color:#1F1F1D; font-weight:600; }
+  .panel .num { font-size:11px; font-weight:600; color:#7F77DD; letter-spacing:.06em; margin-bottom:10px; }
+  .panel h3 { font-size:15px; font-weight:600; margin-bottom:10px; line-height:1.5; }
+  .panel p { font-size:13px; color:#5F5E5A; }
+  .panel p + p { margin-top:8px; }
+  .panel b { color:#1F1F1D; font-weight:600; }
+
+  .flowbox { background:#fff; border:1px solid #E5E3DC; border-radius:12px; padding:26px 24px; }
+  .flowline { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .fstep { background:#F4F2EC; border-radius:8px; padding:9px 14px; font-size:13px; font-weight:500; }
+  .fstep.ours { background:#EEEDFE; color:#26215C; }
+  .fstep.theirs { background:#E1F5EE; color:#04342C; }
+  .farrow { color:#B4B2A9; font-size:14px; }
+  .flow-note { font-size:12.5px; color:#888780; margin-top:16px; }
+
+  .split { display:grid; grid-template-columns:1fr 1fr; gap:0; background:#fff; border:1px solid #E5E3DC; border-radius:12px; overflow:hidden; }
+  .split > div { padding:22px; }
+  .split > div:first-child { border-right:1px solid #E5E3DC; }
+  .split h3 { font-size:14px; font-weight:600; margin-bottom:6px; }
+  .split .sub { font-size:12px; color:#888780; margin-bottom:14px; }
+  .split ul { list-style:none; }
+  .split li { font-size:13px; color:#5F5E5A; padding:6px 0 6px 16px; position:relative; }
+  .split li::before { content:""; position:absolute; left:0; top:14px; width:5px; height:5px; border-radius:50%; background:#CECBF6; }
 
   .key { background:#FCFCFF; border:1px solid #CECBF6; border-radius:12px; padding:24px; }
   .key h3 { font-size:15px; font-weight:600; margin-bottom:10px; color:#26215C; }
   .key p { font-size:13.5px; color:#3C3489; line-height:1.75; }
   .key p + p { margin-top:10px; }
-  .key code { font-family:ui-monospace,"SF Mono",Consolas,monospace; font-size:12px; background:#EEEDFE; padding:2px 6px; border-radius:4px; }
 
-  .warn { background:#FCEBEB; border:1px solid #F7C1C1; border-radius:12px; padding:20px 22px; }
-  .warn h3 { font-size:14px; font-weight:600; color:#791F1F; margin-bottom:8px; }
-  .warn p { font-size:13px; color:#A32D2D; line-height:1.7; }
-  .warn code { font-family:ui-monospace,monospace; font-size:12px; background:#F7C1C1; padding:2px 6px; border-radius:4px; }
+  pre { background:#2C2C2A; color:#E8E6DF; border-radius:10px; padding:18px 20px; overflow-x:auto; font-family:ui-monospace,"SF Mono",Consolas,monospace; font-size:12.5px; line-height:1.75; }
+  pre .c { color:#888780; }
+  pre .k { color:#9FE1CB; }
+  pre .s { color:#FAC775; }
+
+  code.inline { font-family:ui-monospace,"SF Mono",Consolas,monospace; font-size:12.5px; background:#F4F2EC; padding:2px 6px; border-radius:4px; color:#3C3489; }
 
   .road { position:relative; padding-left:26px; }
   .road::before { content:""; position:absolute; left:6px; top:8px; bottom:8px; width:1px; background:#E5E3DC; }
-  .mile { position:relative; padding-bottom:28px; }
+  .mile { position:relative; padding-bottom:26px; }
   .mile:last-child { padding-bottom:0; }
   .mile::before { content:""; position:absolute; left:-24px; top:7px; width:9px; height:9px; border-radius:50%; background:#fff; border:2px solid #B4B2A9; }
   .mile.key-m::before { border-color:#534AB7; background:#534AB7; }
   .mile h3 { font-size:14px; font-weight:600; margin-bottom:4px; }
-  .mile .gate { font-size:12px; color:#888780; margin-bottom:6px; }
+  .mile h3 span { font-size:12px; font-weight:400; color:#888780; margin-left:8px; }
   .mile p { font-size:13px; color:#5F5E5A; }
-  .mile .fail { font-size:12.5px; color:#A32D2D; margin-top:6px; }
 
   .note { margin-top:40px; padding:18px 20px; background:#FAEEDA; border-radius:10px; font-size:13px; color:#633806; line-height:1.7; }
   .note b { font-weight:600; }
 
   @media (max-width:760px) {
     .wrap { padding:36px 20px 60px; }
-    .grid2, .grid3 { grid-template-columns:1fr; }
-    table { font-size:12px; }
+    .grid3, .grid2, .split { grid-template-columns:1fr; }
+    .split > div:first-child { border-right:none; border-bottom:1px solid #E5E3DC; }
     th, td { padding:10px 12px; }
   }
 </style>
@@ -79,225 +94,179 @@
 <div class="wrap">
 
   <header>
-    <div class="eyebrow">产品方案 · v0.3 · 待原型验证</div>
+    <div class="eyebrow">产品方案 · v1.0 · 转向版</div>
     <h1>DeskAgent</h1>
-    <p class="lead">让 Agent 看懂你的桌面，然后把它重新摆好。本版把 v0.2 的<strong>过度承诺收回到可验收的范围</strong>，并把最大的技术不确定项推到 M0 实机验证。</p>
+    <p class="lead">给桌面整理器装上语义大脑。<strong>不重做桌面工具，只做它做不了的那一层</strong>——判断每个图标到底是什么。</p>
   </header>
 
   <section>
-    <h2>七条评审意见的处理</h2>
-    <table>
-      <thead><tr><th></th><th>问题</th><th>v0.3 处理</th></tr></thead>
-      <tbody>
-        <tr><td class="n">1</td><td>收纳盒交互仅依据 SelectAndPositionItems，折叠/隐藏未验证</td><td>拆出完整交互规格；<span class="no">折叠的隐藏语义判定为不可行</span>，从承诺中删除</td></tr>
-        <tr><td class="n">2</td><td>"零风险/一切可逆/完整回滚"过度承诺</td><td>改为有条件承诺表，明确冲突、部分成功、崩溃、过期边界</td></tr>
-        <tr><td class="n">3</td><td>MCP 的 confirm:true 不能证明用户确认</td><td>改为可信界面签发一次性凭证，绑定方案哈希 + 桌面指纹</td></tr>
-        <tr><td class="n">4</td><td>AI 价值验证滞后，增量维护太晚</td><td>对照实验提前到 M0；增量提示进入 M1</td></tr>
-        <tr><td class="n">5</td><td>权重与阈值是假设，分类带个人偏好</td><td>改为五层优先级链；置信度改用历史命中率；学习改建议制</td></tr>
-        <tr><td class="n">6</td><td>隐私承诺有实现缺口</td><td>确认 GetImage 默认返回缩略图，强制 <code style="font-family:ui-monospace,monospace;font-size:12px">SIIGBF_ICONONLY</code></td></tr>
-        <tr><td class="n">7</td><td>日常使用规则缺失</td><td>补六场景规则表；修正多屏负坐标与系统通知拆分</td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <section>
-    <h2>收纳盒：能力边界</h2>
-    <table>
-      <thead><tr><th>能力</th><th>轻盒（视觉容器）</th><th>物理盒（真实文件夹）</th></tr></thead>
-      <tbody>
-        <tr><td>框住图标</td><td class="yes">覆盖层绘制</td><td class="yes">桌面文件夹图标</td></tr>
-        <tr><td>拖动整体移动</td><td class="yes">重算坐标</td><td class="yes">移动文件夹</td></tr>
-        <tr><td>紧凑排列</td><td class="yes">间距缩小约 50%</td><td>—</td></tr>
-        <tr><td><b>真正隐藏内容</b></td><td class="no">不可能</td><td class="yes">桌面只剩文件夹</td></tr>
-        <tr><td>内部显示文件图标</td><td class="yes">原生图标</td><td class="no">只显示数量</td></tr>
-        <tr><td>文件系统改动</td><td class="yes">无</td><td class="mid">有</td></tr>
-      </tbody>
-    </table>
-    <div class="key" style="margin-top:16px">
-      <h3>为什么"折叠"被删掉了</h3>
-      <p>v0.2 写"折叠后把图标坐标堆在标题栏下方"。但<strong>堆叠不等于隐藏</strong>——图标仍然可见、可点、可框选，堆在一起还会导致点击命中错乱。</p>
-      <p>Shell 没有任何"隐藏单个桌面图标"的接口。所以轻盒的"折叠"只能是<strong>紧凑化</strong>（图标排得更密，全部可见），要真正收起必须用物理盒。UI 上不再出现"折叠"这个词。</p>
-    </div>
-  </section>
-
-  <section>
-    <h2>窗口层级：三态互斥</h2>
+    <h2>为什么转向</h2>
     <div class="grid3">
       <div class="panel">
-        <h3>常驻态</h3>
-        <div class="sub">默认状态</div>
-        <ul>
-          <li>盒子边框窗口 <b>SetParent 到 WorkerW</b></li>
-          <li>位于<b>壁纸之上、图标之下</b></li>
-          <li>图标浮在盒子上，点击正常穿透</li>
-          <li>标题栏区域预留空白，不被图标盖住</li>
-        </ul>
+        <div class="num">理由 01</div>
+        <h3>该做的有人做了</h3>
+        <p>PecoFence 用 <b>21 天 10 个版本</b>做到了栅栏、折叠、标签页、多屏、动态壁纸取色。DeskBox 把原生质感做到极致。</p>
+        <p>重做这些是几十人月的重复劳动。</p>
       </div>
       <div class="panel">
-        <h3>预览态</h3>
-        <div class="sub">仅整理时出现</div>
-        <ul>
-          <li>全屏浮层，Topmost</li>
-          <li><b>WS_EX_NOACTIVATE</b> 不抢焦点</li>
-          <li>拖拽图标跨盒、调整分区</li>
-          <li>确认后执行并关闭</li>
-        </ul>
+        <div class="num">理由 02</div>
+        <h3>我们缺的那层恰好没人做</h3>
+        <p>PecoFence 的规则只认<b>扩展名、类型、文件名、大小、时间</b>。</p>
+        <p>它不知道 <code class="inline">Yaak</code> 是 API 调试工具、<code class="inline">Sciland</code> 是游戏。</p>
       </div>
       <div class="panel">
-        <h3>编辑态</h3>
-        <div class="sub">改配置时</div>
-        <ul>
-          <li>复用预览态窗口</li>
-          <li>改名 / 改色 / 合并 / 解散</li>
-          <li>转为物理收纳</li>
-          <li>不与常驻态同时存在</li>
-        </ul>
+        <div class="num">理由 03</div>
+        <h3>成本集中在最不该自研的部分</h3>
+        <p>Shell COM、WorkerW、坐标操纵、watchdog、Direct2D 是苦力活，已有成熟实现。</p>
+        <p>而<b>语义判断</b>才是真有壁垒的部分。</p>
       </div>
-    </div>
-    <div class="note" style="background:#F1EFE8;color:#444441">
-      <b>关键取舍：布局持久，容器临时。</b>应用退出后盒子边框消失，但图标坐标是 Shell 持久化的，会保留。用户看到"布局还在但框没了"是预期行为，不是故障。
     </div>
   </section>
 
   <section>
-    <h2>承诺边界</h2>
-    <table>
-      <thead><tr><th>能力</th><th>承诺</th><th>不承诺</th></tr></thead>
-      <tbody>
-        <tr><td>图标布局</td><td>保存全部坐标，可还原到执行前</td><td>不还原用户执行后手动做的调整</td></tr>
-        <tr><td>文件移动</td><td>记录源路径与结果，可把成功项移回</td><td class="no">不备份内容；不恢复用户后续编辑/删除</td></tr>
-        <tr><td>冲突处理</td><td>默认不覆盖，冲突项跳过并提示</td><td>不自动合并、不自动改名</td></tr>
-        <tr><td>部分失败</td><td>允许部分成功，撤销只针对成功项</td><td>不保证原子性</td></tr>
-        <tr><td>崩溃恢复</td><td>意图日志判断进度，可继续或回滚</td><td>不保证内存状态一致</td></tr>
-        <tr><td>撤销期限</td><td class="mid">30 天（可延长至 90 天）</td><td>过期后仅保留只读历史</td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <section>
-    <h2>授权链路</h2>
-    <div class="grid2">
-      <div class="warn">
-        <h3>v0.2 的漏洞</h3>
-        <p><code>confirm: true</code> 由调用方 Agent 自己填写。它只能表达"Agent 想执行"，<b>不能证明用户同意执行</b>。涉及文件移动的授权不能来自工具参数。</p>
-      </div>
-      <div class="panel">
-        <h3>v0.3 的机制</h3>
+    <h2>产品边界</h2>
+    <div class="split">
+      <div>
+        <h3>DeskAgent 做</h3>
+        <div class="sub">语义与决策</div>
         <ul>
-          <li>主程序弹<b>逐条列出源→目标</b>的确认面板</li>
-          <li>用户点「执行」后签发<b>一次性凭证</b></li>
-          <li>凭证绑定：plan_hash + 桌面指纹 + nonce + 60 秒过期</li>
-          <li>方案改了 hash 就变，必须重新确认</li>
-          <li>执行层校验路径白名单，拒绝 <code>..</code> 穿越</li>
+          <li>枚举桌面条目</li>
+          <li>解析 .lnk 目标路径、PE 版本信息、数字签名</li>
+          <li>语义分类判断</li>
+          <li>把方案编译成 PecoFence 规则</li>
+          <li>调 <code class="inline">pecofence-cli</code> 落地</li>
+          <li>增量监听与归位</li>
+        </ul>
+      </div>
+      <div>
+        <h3>PecoFence 做</h3>
+        <div class="sub">渲染与交互</div>
+        <ul>
+          <li>渲染栅栏、玻璃效果</li>
+          <li>折叠、标签页</li>
+          <li>图标提取、缩略图</li>
+          <li>拖放、右键菜单、重命名</li>
+          <li>多显示器布局</li>
+          <li>崩溃恢复、watchdog</li>
         </ul>
       </div>
     </div>
   </section>
 
   <section>
-    <h2>分类：五层优先级链</h2>
-    <table>
-      <thead><tr><th>优先级</th><th>来源</th><th>说明</th></tr></thead>
-      <tbody>
-        <tr><td class="n">1</td><td><b>用户明确指定 / 锁定</b></td><td>最高，模型永不覆盖</td></tr>
-        <tr><td class="n">2</td><td>用户手写规则</td><td></td></tr>
-        <tr><td class="n">3</td><td>用户已确认的学习规则</td><td>三次同类修正 → 提出建议，用户确认后生效</td></tr>
-        <tr><td class="n">4</td><td>内置规则包</td><td></td></tr>
-        <tr><td class="n">5</td><td>模型建议</td><td>仅在 1–4 都未命中时使用</td></tr>
-      </tbody>
-    </table>
-    <div class="grid2" style="margin-top:16px">
-      <div class="panel">
-        <h3>置信度从哪来</h3>
-        <div class="sub">不用模型自报的概率</div>
-        <ul>
-          <li>每个信号组合维护<b>历史命中计数</b></li>
-          <li>置信度 = 用户接受率的 Wilson 下界</li>
-          <li>冷启动无数据 → 全部进"建议区"</li>
-          <li>用户确认的过程本身在积累数据</li>
-        </ul>
+    <h2>工作流</h2>
+    <div class="flowbox">
+      <div class="flowline">
+        <span class="fstep ours">scan</span>
+        <span class="farrow">→</span>
+        <span class="fstep ours">classify</span>
+        <span class="farrow">→</span>
+        <span class="fstep ours">plan</span>
+        <span class="farrow">→</span>
+        <span class="fstep">人工审阅</span>
+        <span class="farrow">→</span>
+        <span class="fstep ours">compile</span>
+        <span class="farrow">→</span>
+        <span class="fstep theirs">apply</span>
       </div>
-      <div class="panel">
-        <h3>M0 对照实验</h3>
-        <div class="sub">验证 AI 是否真的降本</div>
-        <ul>
-          <li>A 组：纯规则　B 组：规则 + LLM</li>
-          <li>指标：修正项数 / 确认耗时 / 24h 后查找时间</li>
-          <li>判定：<b>B 的修正项比 A 低 30% 以上</b></li>
-          <li>未达标 → 产品定位需重新评估</li>
-        </ul>
-      </div>
+      <div class="flow-note">紫色是我们，绿色是 PecoFence。PecoFence 未安装时仍可独立输出方案 JSON，不绑死。</div>
     </div>
   </section>
 
   <section>
-    <h2>隐私：一个具体的实现缺口</h2>
-    <div class="warn">
-      <h3>GetImage 默认返回的是缩略图</h3>
-      <p>官方文档原文：<i>"The default behavior is to load a thumbnail."</i> 一个 <code>报告.docx</code> 的"图标"实际是文档内容的缩略图。如果经 <code>desktop_get_icon</code> 交给外部 Agent，<b>文档内容就传出去了</b>。</p>
-      <p style="margin-top:10px">修正：所有提取强制 <code>SIIGBF_ICONONLY (0x4)</code>，加单元测试断言，禁止任何不带该 flag 的调用路径。</p>
+    <h2>技术核心：规则编译</h2>
+    <div class="key">
+      <h3>分类结果必须拆成两半</h3>
+      <p>PecoFence 的规则引擎是<b>属性驱动</b>的，不是<b>语义驱动</b>的。所以同一个分类结果，要拆成「能变成持久规则的部分」和「只能一次性移动的部分」。</p>
     </div>
     <table style="margin-top:16px">
-      <thead><tr><th>字段</th><th>是否上传</th><th>处理</th></tr></thead>
+      <thead><tr><th>分类依据</th><th>例子</th><th>能否变成持久规则</th></tr></thead>
       <tbody>
-        <tr><td>完整路径</td><td class="no">永不</td><td>仅本地用于规则匹配</td></tr>
-        <tr><td>文件名</td><td class="mid">条件</td><td>默认脱敏，开关打开才原文发送</td></tr>
-        <tr><td>快捷方式参数</td><td class="no">永不</td><td>可能含令牌、账号、路径</td></tr>
-        <tr><td>URL 查询参数</td><td class="no">剥离</td><td>只留 scheme + host + path</td></tr>
-        <tr><td>图标图像</td><td class="mid">条件</td><td>强制 ICONONLY，不含内容</td></tr>
-        <tr><td>公司名 / 签名主体</td><td class="yes">是</td><td>明文</td></tr>
+        <tr><td>扩展名</td><td><code class="inline">.pdf/.docx</code> → 文档</td><td class="yes">能　rule add --ext pdf,docx</td></tr>
+        <tr><td>类型</td><td>所有安装包 → 归档</td><td class="yes">能　rule add --type installers</td></tr>
+        <tr><td>文件名</td><td>名字含 Chrome → 浏览器</td><td class="yes">能　rule add --name-contains</td></tr>
+        <tr><td><b>语义</b></td><td>Steam.lnk 目标是 \Steam\steam.exe → 游戏</td><td class="no">不能　规则表达不了</td></tr>
       </tbody>
     </table>
-  </section>
-
-  <section>
-    <h2>分阶段验收</h2>
-    <div class="road">
-      <div class="mile key-m">
-        <h3>M0 · 技术与价值验证</h3>
-        <div class="gate">10 项通过条件</div>
-        <p>可交互桌面区域原型 + 规则/LLM 对照实验 + 异常恢复报告。验证拖动延迟、双击打开、框选、Win+D、Explorer 重启、崩溃恢复、副屏负坐标。</p>
-        <p class="fail">任一项交互不通过 → 收纳盒方案重新设计，MVP 不启动。对照实验未达标 → 产品定位重估。</p>
-      </div>
-      <div class="mile key-m">
-        <h3>M1 · 首次可用版本</h3>
-        <div class="gate">7 项通过条件</div>
-        <p>扫描、分类建议、预览、布局、撤销、基础增量提示。</p>
-        <p class="fail">新用户 5 分钟独立完成整理；手动调整必须保留；强杀进程不出现图标不可访问。</p>
-      </div>
-      <div class="mile">
-        <h3>M2 · 受控文件归档</h3>
-        <div class="gate">7 项通过条件</div>
-        <p>可信确认界面、冲突处理、逐项日志、中断恢复。</p>
-        <p class="fail">同名冲突不覆盖；10 项中 3 项失败时撤销只回滚 7 项；无凭证的写请求必须被拒绝。</p>
-      </div>
-      <div class="mile">
-        <h3>M3 · 能力扩展</h3>
-        <div class="gate">6 项通过条件</div>
-        <p>双模型体验、自然语言、MCP 发布、规则学习。</p>
-        <p class="fail">抓包审计无路径/缩略图/参数外传；本地模型失败不自动上云。</p>
-      </div>
+    <div class="note">
+      <b>这就是本产品存在的全部理由：</b>语义分类无法沉淀成 PecoFence 规则，新装的游戏不会被自动归类。所以增量守护必须由 DeskAgent 自己做——不能指望 PecoFence 的规则引擎。
     </div>
   </section>
 
   <section>
-    <h2>M0 待验证清单</h2>
+    <h2>落地方式</h2>
+    <pre><span class="c"># 1. 先快照，保证可回滚</span>
+pecofence-cli <span class="k">snapshot save</span> <span class="s">"deskagent-before-apply"</span>
+
+<span class="c"># 2. 可规则化的部分 → 持久规则</span>
+pecofence-cli <span class="k">rule add</span> --name 文档 --ext pdf,docx --to 文档
+
+<span class="c"># 3. 语义分类的部分 → 一次性移动，先 dry-run</span>
+pecofence-cli <span class="k">item move</span> --glob <span class="s">"Steam.lnk"</span> --from 桌面 --to 游戏 --dry-run
+
+<span class="c"># 4. 确认无误再执行</span>
+pecofence-cli <span class="k">item move</span> --glob <span class="s">"Steam.lnk"</span> --from 桌面 --to 游戏</pre>
+    <p style="font-size:12.5px;color:#888780;margin-top:14px">超时（退出码 4）不重试——先 <code class="inline">fence list</code> 读回状态再决定，因为请求可能已生效。</p>
+  </section>
+
+  <section>
+    <h2>CLI 命令</h2>
     <table>
-      <thead><tr><th></th><th>问题</th><th>若不成立</th></tr></thead>
+      <thead><tr><th>命令</th><th>作用</th></tr></thead>
       <tbody>
-        <tr><td class="n">1</td><td>盒子挂 WorkerW 下能否正常接收鼠标拖动</td><td>改用 topmost 分层，复杂度上升</td></tr>
-        <tr><td class="n">2</td><td>拖动时实时重算坐标的性能（目标 &lt;100ms）</td><td>改为松手后一次性重排</td></tr>
-        <tr><td class="n">3</td><td>Win+D 时盒子是否随桌面显示</td><td>改挂 Progman</td></tr>
-        <tr><td class="n">4</td><td>Explorer 重启后接口重获取的稳定性</td><td>降级：布局保留但盒子不恢复</td></tr>
-        <tr><td class="n">5</td><td>AI 分类是否真的降低整理成本</td><td>产品定位重新评估</td></tr>
-        <tr><td class="n">6</td><td>不同 DPI 下坐标映射是否稳定</td><td>限制支持范围或要求重启</td></tr>
-        <tr><td class="n">7</td><td>拖拽图标跨盒子的归属判定</td><td>简化为仅整盒拖动</td></tr>
+        <tr><td><code class="inline">deskagent scan</code></td><td>扫描桌面，输出条目清单</td></tr>
+        <tr><td><code class="inline">deskagent classify</code></td><td>分类，输出方案</td></tr>
+        <tr><td><code class="inline">deskagent plan --out plan.json</code></td><td>生成可审阅的方案文件</td></tr>
+        <tr><td><code class="inline">deskagent apply plan.json</code></td><td>落地，调 pecofence-cli</td></tr>
+        <tr><td><code class="inline">deskagent watch</code></td><td>增量守护</td></tr>
+        <tr><td><code class="inline">deskagent describe</code> / <code class="inline">skill</code></td><td>自描述，供 AI agent 发现能力</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:12.5px;color:#888780;margin-top:14px">选 CLI 不选 MCP：编码 agent 都有 Bash 工具，MCP 需额外配置。后续要 MCP 只需把命令映射成工具。</p>
+  </section>
+
+  <section>
+    <h2>路线图</h2>
+    <div class="road">
+      <div class="mile key-m">
+        <h3>M0 · 分类准确率验证 <span>1 周</span></h3>
+        <p>scan + classify，只输出方案不落地。通过条件：35 个快捷方式中 ≥33 个拿到目标路径，规则分类准确率 ≥80%，<b>Zed/Yaak/Sciland/夸克 四个难点样本全部正确</b>。</p>
+      </div>
+      <div class="mile key-m">
+        <h3>M1 · 落地到 PecoFence <span>1 周</span></h3>
+        <p>适配层 + apply。一条命令完成从扫描到布局，快照可回滚，重复执行幂等。</p>
+      </div>
+      <div class="mile">
+        <h3>M2 · 规则编译与增量守护 <span>2 周</span></h3>
+        <p>规则编译器、watch 增量归位、学习规则沉淀。新图标 5 秒内给出归位建议。</p>
+      </div>
+      <div class="mile">
+        <h3>M3 · LLM 与评测 <span>2 周</span></h3>
+        <p>双模型接入、对照实验、自描述。判定线：操作数比手写规则低 50% 以上。</p>
+      </div>
+    </div>
+    <p style="font-size:13px;color:#5F5E5A;margin-top:18px">总工期约 <b>6 周</b>，对比 v0.3 的 13–15 周，省下的全是渲染和 Shell 交互。</p>
+  </section>
+
+  <section>
+    <h2>v0.3 与 v1.0 对比</h2>
+    <table>
+      <thead><tr><th>维度</th><th>v0.3</th><th>v1.0</th></tr></thead>
+      <tbody>
+        <tr><td>产品形态</td><td>完整桌面应用</td><td>CLI 工具</td></tr>
+        <tr><td>渲染</td><td>自己做（WorkerW + 覆盖层）</td><td class="yes">不做，用 PecoFence</td></tr>
+        <tr><td>图标操纵</td><td>IFolderView2 改坐标</td><td class="yes">不做，调 item move</td></tr>
+        <tr><td>折叠</td><td>自己实现（判定不可行）</td><td class="yes">不做，已有</td></tr>
+        <tr><td>接入方式</td><td>MCP 为主</td><td>CLI 为主</td></tr>
+        <tr><td>核心模块</td><td>采集/分类/布局/执行/接入</td><td>采集/分类/<b>编译</b>/适配</td></tr>
+        <tr><td>工期</td><td>13–15 周</td><td class="yes">约 6 周</td></tr>
+        <tr><td>风险</td><td>高（渲染管线）</td><td>中（只赌分类准确率）</td></tr>
       </tbody>
     </table>
   </section>
 
   <div class="note">
-    <b>样本集不足：</b>当前桌面 35 个条目全部是快捷方式，不满足评测要求。需补充文档、截图、临时文件、文件夹样本，并保留 30% 不参与调优的验证集，避免只对当前桌面有效。
+    <b>唯一的生死线：</b>AI 分类是否真的比手写规则省事。M0 必须先回答，不达标就停。样本集目前不足——桌面只有 35 个快捷方式，需要补充文档、截图、临时文件才能做评测。
   </div>
 
 </div>
