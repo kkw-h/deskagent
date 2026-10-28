@@ -68,6 +68,19 @@ impl Default for Options {
 
 /// 按规则包分类并组装成计划。
 pub fn build(items: &[Item], pack: &RulePack, opts: &Options) -> Plan {
+    build_with(items, pack, opts, &[])
+}
+
+/// 同 [`build`]，但允许给规则没覆盖到的条目补上判断（来自模型）。
+///
+/// `extra` 是 `(file_name, group)`。规则优先：只要规则判出来了，就不看 `extra`，
+/// 保证模型不会覆盖确定性判断。
+pub fn build_with(
+    items: &[Item],
+    pack: &RulePack,
+    opts: &Options,
+    extra: &[(String, String)],
+) -> Plan {
     let mut groups: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut skipped = Vec::new();
 
@@ -76,10 +89,17 @@ pub fn build(items: &[Item], pack: &RulePack, opts: &Options) -> Plan {
             Some((group, _reason)) => {
                 groups.entry(group).or_default().push(item.path.clone());
             }
-            None => skipped.push(Skipped {
-                name: item.name.clone(),
-                reason: "规则包未覆盖".into(),
-            }),
+            None => {
+                match extra.iter().find(|(f, _)| *f == item.file_name) {
+                    Some((_, group)) => {
+                        groups.entry(group.clone()).or_default().push(item.path.clone());
+                    }
+                    None => skipped.push(Skipped {
+                        name: item.name.clone(),
+                        reason: "规则包未覆盖".into(),
+                    }),
+                }
+            }
         }
     }
 

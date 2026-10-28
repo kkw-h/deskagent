@@ -87,6 +87,7 @@ dependencies = [
  "clap",
  "deskagent-classify",
  "deskagent-compile",
+ "deskagent-llm",
  "deskagent-pecofence",
  "deskagent-scan",
  "serde",
@@ -109,6 +110,16 @@ dependencies = [
  "deskagent-classify",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "deskagent-llm"
+version = "0.1.0"
+dependencies = [
+ "deskagent-classify",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

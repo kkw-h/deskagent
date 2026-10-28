@@ -54,9 +54,10 @@ Rust CLI。
 ```
 crates/scan       桌面枚举 + .lnk 深解析 + PE 版本信息
 crates/classify   规则引擎 + 置信度
-crates/compile    分类结果 → 栅栏方案 + 网格布局
+crates/compile    分类结果 → 栅栏方案 + 网格布局 + 规则编译
 crates/pecofence  pecofence-cli 适配层
-crates/storage    SQLite（历史、学习规则、缓存，M2 起用）
+crates/llm        OpenAI 兼容客户端（云端/本地双模式）+ 隐私去标识化
+crates/storage    SQLite（历史、学习规则，尚未启用）
 crates/cli        命令行入口
 ```
 
@@ -65,19 +66,25 @@ crates/cli        命令行入口
 
 ## 状态
 
-M0、M1 已完成。当前可用命令：
+M0–M3 全部完成。当前可用命令：
 
 ```bash
-deskagent scan                    # 扫桌面，列出条目与元数据覆盖
-deskagent classify                # 扫桌面并分类
-deskagent plan                    # 生成整理方案，不触碰系统
-deskagent apply                   # 打印要执行的动作（dry-run）
-deskagent apply --yes             # 真正建栅栏并搬图标
-deskagent eval --dir <DIR> --labels <YAML> --split all
-deskagent classify-json --input <JSON>   # 分类外部条目（注册表、清单文件）
+deskagent scan                    # 扫目录，列出条目与元数据覆盖
+deskagent classify                # 扫描并分类
+deskagent plan [--llm]            # 生成整理方案，不触碰系统
+deskagent apply [--yes] [--with-rules] [--llm]   # 落地到 PecoFence
+deskagent rules                   # 推导可沉淀成持久规则的扩展名规则
+deskagent watch [--once]          # 增量守护，新图标出现即归位
+deskagent resolve [--all]         # 让模型给规则未覆盖的条目补判断
+deskagent eval --labels <YAML>    # 用带标注的样本评测规则包
+deskagent bench --labels <YAML>   # 对照实验：规则 vs 模型的人工操作成本
+deskagent describe                # 机器可读的命令目录
+deskagent skill                   # 给编码 agent 的使用指南
 ```
 
-实测（详见 [评测报告.md](评测报告.md)）：
+### 实测数字
+
+规则包（详见 [评测报告.md](评测报告.md)）：
 
 | 数据集 | 覆盖率 | 准确率 |
 |---|---|---|
@@ -87,18 +94,27 @@ deskagent classify-json --input <JSON>   # 分类外部条目（注册表、清�
 
 ※ 该数据集已参与调优，数字不可引用。可引用的干净估计是 86%–96%。
 
+对照实验（操作次数，越少越好）：
+
+| 样本 | 手写规则 | 模型（96% 准确率） | 结论 |
+|---|---|---|---|
+| 70 条快捷方式 | 70 | 3.8 | 模型大幅胜出 |
+| 4 条文档/媒体 | 2 | 1.4 | 规则胜出，模型最多打平 |
+
+**这条决定了产品定位**：AI 的价值不在「比规则更准」，而在「规则根本表达不了的场景」。
+扩展名能表达的分类（文档、图片、音视频），PecoFence 规则又快又免费，AI 没有优势；
+快捷方式和绿色软件的分类，规则完全无能，AI 是唯一选项。
+
+所以准确的说法是：**DeskAgent 补的是 PecoFence 规则引擎的表达能力缺口，不是判断能力缺口。**
+
 | 阶段 | 交付 | 通过条件 | 状态 |
 |---|---|---|---|
 | M0 | scan + classify，只输出方案 | 难点样本全部正确，准确率 ≥80% | 已完成 |
 | M1 | 落地到 PecoFence | 一条命令完成布局，快照可回滚 | 代码完成，待真机验证 |
-| M2 | 规则编译 + 增量守护 | 新图标 5 秒内归位建议 | 未开始 |
-| M3 | LLM 双模式 + 评测 | 操作数比手写规则低 50% | 未开始 |
+| M2 | 规则编译 + 增量守护 | 新图标 5 秒内归位建议 | 代码完成，待真机验证 |
+| M3 | LLM 双模式 + 自描述 + 对照实验 | 操作数比手写规则低 50% | 已完成（模型侧为假设值） |
 
-**生死线**：AI 分类是否真的比手写规则省事。M0 测出瓶颈在覆盖率（70% → 96%），
-但「AI 比手写规则省事」这个对照实验还没做——手写规则目前覆盖 96%，
-LLM 的价值只剩下「剩下 4% + 未知软件」。这个判断要等 M3 的数据。
-
-### M1 的三条安全约束
+### M1–M3 的三条安全约束
 
 `apply` 会真的改动桌面，所以做了三道防护：
 
@@ -107,7 +123,13 @@ LLM 的价值只剩下「剩下 4% + 未知软件」。这个判断要等 M3 的
    等于在资源管理器里搬文件。同名 portal 会被整组跳过，而不是复用。
 3. **`--yes` 才动手**。没有这个标志一律按 dry-run 处理，不依赖 PecoFence 是否安装。
 
-### M1 未验证的部分
+另外模型侧还有两道：
+
+4. **只上传去标识化字段**。路径只保留产品段，`C:\Users\张三\Desktop\客户名单.xlsx`
+   上传的是 `Desktop\客户名单.xlsx`。有测试钉住用户名不会泄露。
+5. **模型发明的分组名一律丢弃**。宁可判不出来留在桌面，也不去创建不存在的栅栏。
+
+### 未验证的部分
 
 `pecofence-cli` 的参数和输出形状是**对源码核对**的，不是实测的——本机没装 PecoFence。
 核对过的形状记在 `crates/pecofence/src/lib.rs` 的模块注释里。真机首次运行时需要确认：
@@ -115,8 +137,27 @@ LLM 的价值只剩下「剩下 4% + 未知软件」。这个判断要等 M3 的
 - `fence create --rect` 在我们算出的网格坐标上不被 `invalid_value` 拒绝
 - `item move` 传完整 `.lnk` 路径能被正确识别为桌面条目
 - `monitor list` 的 `workArea` 在非 100% 缩放下取值符合预期
+- `watch --once` 的事件形状与 `ItemDto` 一致
 
-参数拼装全部抽成了纯函数并有断言测试（25 个），因为这部分错了整个产品就错了。
+模型侧只用本地假服务验证过 HTTP 链路与解析，没有接真实模型跑过。`bench` 的模型数字
+是 `--assume-accuracy` 代入的算术结果，不是实测。
+
+### LLM 双模式配置
+
+```bash
+# 本地（Ollama，数据不出本机）
+export DESKAGENT_LLM_BASE_URL=http://127.0.0.1:11434/v1
+export DESKAGENT_LLM_MODEL=qwen2.5
+
+# 云端（OpenAI 兼容）
+export DESKAGENT_LLM_BASE_URL=https://api.openai.com/v1
+export DESKAGENT_LLM_API_KEY=sk-...
+export DESKAGENT_LLM_MODEL=gpt-4o-mini
+```
+
+HTTP 走系统自带的 `curl.exe`，不引入 TLS 依赖——GNU 工具链下 `ring` 需要 C 编译器，
+会把构建链打回原形。本地回环地址会自动加 `--noproxy`，否则机器上设了 `http_proxy`
+时 curl 会把回环请求也送进代理，直接 502（踩过）。
 
 ## 历史
 

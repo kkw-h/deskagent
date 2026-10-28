@@ -67,12 +67,23 @@ impl RulePack {
 
     /// 按优先级从高到低匹配，返回第一个命中。
     pub fn classify(&self, item: &Item) -> Option<(String, String)> {
-        let mut rules: Vec<&Rule> = self.rules.iter().collect();
-        rules.sort_by(|a, b| b.priority.cmp(&a.priority));
+        self.classify_with_rule(item)
+            .map(|(_, group, reason)| (group, reason))
+    }
 
-        for rule in rules {
+    /// 同 [`classify`](Self::classify)，额外返回命中规则的下标。
+    ///
+    /// 对照实验要按「用户手写了多少条规则」计成本，所以必须知道命中的是哪一条，
+    /// 而不是只看分到了哪个组。
+    pub fn classify_with_rule(&self, item: &Item) -> Option<(usize, String, String)> {
+        let mut order: Vec<usize> = (0..self.rules.len()).collect();
+        // 稳定排序：同优先级保持 yaml 里的先后顺序
+        order.sort_by(|a, b| self.rules[*b].priority.cmp(&self.rules[*a].priority));
+
+        for idx in order {
+            let rule = &self.rules[idx];
             if let Some(reason) = rule.matches(item) {
-                return Some((rule.group.clone(), reason));
+                return Some((idx, rule.group.clone(), reason));
             }
         }
         None

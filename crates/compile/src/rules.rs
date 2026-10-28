@@ -22,6 +22,15 @@ use deskagent_classify::{Item, RulePack};
 /// 塞进同一个栅栏，所以不参与编译。
 const SEMANTIC_EXTS: [&str; 2] = [".lnk", ".url"];
 
+/// 这个扩展名能否用来表达分类判断。
+///
+/// 快捷方式不行：所有 `.lnk` 长得一样，规则无法区分 Steam 和 Zed。
+/// 对照实验要按「能不能写成规则」把条目分成两拨，所以这个判断要公开。
+pub fn is_semantic_ext(ext: &str) -> bool {
+    let e = ext.to_lowercase();
+    e.is_empty() || SEMANTIC_EXTS.contains(&e.as_str())
+}
+
 /// 一条可以直接交给 `rule add` 的规则。
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtRule {
@@ -71,7 +80,7 @@ pub fn compile_ext_rules(items: &[Item], pack: &RulePack) -> Compiled {
 
     for item in items {
         let ext = item.ext.to_lowercase();
-        if ext.is_empty() || SEMANTIC_EXTS.contains(&ext.as_str()) {
+        if is_semantic_ext(&ext) {
             skipped_semantic += 1;
             continue;
         }

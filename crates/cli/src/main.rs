@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand};
 use deskagent_classify::{Item, RulePack};
 use deskagent_compile as compile;
+use deskagent_llm as llm;
 use deskagent_pecofence as pecofence;
 
 /// 内置规则包随二进制发布，避免运行期依赖文件路径。
@@ -77,6 +78,9 @@ enum Cmd {
         /// 少于这个条目数的分组不建栅栏
         #[arg(long, default_value_t = 2)]
         min_items: usize,
+        /// 规则判不出来的条目交给模型补判断
+        #[arg(long)]
+        llm: bool,
         /// 以 JSON 输出
         #[arg(long)]
         json: bool,
@@ -96,6 +100,40 @@ enum Cmd {
         #[arg(long)]
         once: bool,
     },
+    /// 用模型给规则包没覆盖到的条目补判断
+    Resolve {
+        /// 扫描指定目录，可重复；缺省时扫桌面
+        #[arg(long, value_name = "DIR")]
+        dir: Vec<PathBuf>,
+        /// 连规则已覆盖的条目也一并问模型，用于对比
+        #[arg(long)]
+        all: bool,
+        /// 以 JSON 输出
+        #[arg(long)]
+        json: bool,
+    },
+    /// 输出机器可读的命令目录，供外部 agent 自描述发现
+    Describe,
+    /// 输出给编码 agent 用的使用指南
+    Skill,
+    /// 对照实验：手写规则与模型分类各需要多少次人工操作
+    Bench {
+        /// 扫描指定目录，可重复；缺省时扫桌面
+        #[arg(long, value_name = "DIR")]
+        dir: Vec<PathBuf>,
+        /// 改用 JSON 条目文件作为样本源
+        #[arg(long, value_name = "FILE")]
+        input: Option<PathBuf>,
+        /// 标注文件（YAML）
+        #[arg(long, value_name = "FILE")]
+        labels: PathBuf,
+        /// 不调用模型，直接假设一个准确率来估算
+        #[arg(long, value_name = "P")]
+        assume_accuracy: Option<f64>,
+        /// 以 JSON 输出
+        #[arg(long)]
+        json: bool,
+    },
     /// 把方案落地到 PecoFence
     Apply {
         /// 扫描指定目录，可重复；缺省时扫桌面
@@ -110,6 +148,9 @@ enum Cmd {
         /// 同时把扩展名类判断沉淀成 PecoFence 持久规则
         #[arg(long)]
         with_rules: bool,
+        /// 规则判不出来的条目交给模型补判断
+        #[arg(long)]
+        llm: bool,
         /// 只演示，不修改任何东西
         #[arg(long)]
         dry_run: bool,
@@ -145,32 +186,82 @@ fn main() -> anyhow::Result<()> {
         Cmd::Plan {
             dir,
             min_items,
+            llm,
             json,
-        } => plan(&dir, min_items, json),
+        } => plan(&dir, min_items, llm, json),
         Cmd::Apply {
             dir,
             min_items,
             area,
             with_rules,
+            llm,
             dry_run,
             yes,
-        } => apply(&dir, min_items, area.as_deref(), with_rules, dry_run, yes),
+        } => apply(&dir, min_items, area.as_deref(), with_rules, llm, dry_run, yes),
         Cmd::Rules { dir, json } => rules(&dir, json),
         Cmd::Watch { once } => watch(once),
+        Cmd::Resolve { dir, all, json } => resolve(&dir, all, json),
+        Cmd::Describe => describe(),
+        Cmd::Skill => skill(),
+        Cmd::Bench {
+            dir,
+            input,
+            labels,
+            assume_accuracy,
+            json,
+        } => bench(&dir, input.as_deref(), &labels, assume_accuracy, json),
     }
 }
 
 // ---------------------------------------------------------------- 方案
 
-fn build_plan(dirs: &[PathBuf], min_items: usize) -> anyhow::Result<compile::Plan> {
+fn build_plan(dirs: &[PathBuf], min_items: usize, use_llm: bool) -> anyhow::Result<compile::Plan> {
     let items = collect(dirs)?;
     let pack = RulePack::from_yaml(BUILTIN_RULES)?;
+    let extra = if use_llm {
+        llm_extras(&items, &pack)?
+    } else {
+        Vec::new()
+    };
     let opts = compile::Options { min_items };
-    Ok(compile::build(&items, &pack, &opts))
+    Ok(compile::build_with(&items, &pack, &opts, &extra))
 }
 
-fn plan(dirs: &[PathBuf], min_items: usize, json: bool) -> anyhow::Result<()> {
-    let p = build_plan(dirs, min_items)?;
+/// 候选分组。模型只能从这里选，避免它发明出 PecoFence 里不存在的栅栏。
+fn candidate_groups() -> Vec<String> {
+    compile::GROUP_ORDER.iter().map(|s| s.to_string()).collect()
+}
+
+/// 规则判不出来的条目交给模型，返回 `(file_name, group)`。
+///
+/// 规则优先：调用方只在规则返回 None 时才用这里的结果，
+/// 确定性判断不会被模型覆盖。
+fn llm_extras(items: &[Item], pack: &RulePack) -> anyhow::Result<Vec<(String, String)>> {
+    let cfg = llm::Config::from_env().ok_or_else(|| {
+        anyhow::anyhow!(
+            "没有配置模型。设置 DESKAGENT_LLM_BASE_URL（本地 Ollama 用 http://127.0.0.1:11434/v1）"
+        )
+    })?;
+    let pending: Vec<Item> = items
+        .iter()
+        .filter(|i| pack.classify(i).is_none())
+        .cloned()
+        .collect();
+    if pending.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let client = llm::Client::new(cfg.clone());
+    eprintln!("模型（{}）：待判断 {} 条", cfg.describe_mode(), pending.len());
+    let suggestions = client.classify(&pending, &candidate_groups())?;
+    Ok(suggestions
+        .into_iter()
+        .filter_map(|s| s.group.map(|g| (s.file_name, g)))
+        .collect())
+}
+
+fn plan(dirs: &[PathBuf], min_items: usize, use_llm: bool, json: bool) -> anyhow::Result<()> {
+    let p = build_plan(dirs, min_items, use_llm)?;
 
     if json {
         let payload = serde_json::json!({
@@ -417,10 +508,11 @@ fn apply(
     min_items: usize,
     area_override: Option<&str>,
     with_rules: bool,
+    use_llm: bool,
     dry_run: bool,
     yes: bool,
 ) -> anyhow::Result<()> {
-    let p = build_plan(dirs, min_items)?;
+    let p = build_plan(dirs, min_items, use_llm)?;
     print_plan(&p);
 
     if p.fences.is_empty() {
@@ -776,6 +868,339 @@ fn report(pack: &RulePack, items: &[Item], json: bool) -> anyhow::Result<()> {
             println!("    {name}");
         }
     }
+    Ok(())
+}
+
+// ---------------------------------------------------------------- 模型补判
+
+fn resolve(dirs: &[PathBuf], all: bool, json: bool) -> anyhow::Result<()> {
+    let items = collect(dirs)?;
+    let pack = RulePack::from_yaml(BUILTIN_RULES)?;
+    let cfg = llm::Config::from_env().ok_or_else(|| {
+        anyhow::anyhow!(
+            "没有配置模型。\n\
+             本地：DESKAGENT_LLM_BASE_URL=http://127.0.0.1:11434/v1 DESKAGENT_LLM_MODEL=qwen2.5\n\
+             云端：再加 DESKAGENT_LLM_API_KEY"
+        )
+    })?;
+
+    let pending: Vec<Item> = items
+        .iter()
+        .filter(|i| all || pack.classify(i).is_none())
+        .cloned()
+        .collect();
+
+    println!("模型：{}", cfg.describe_mode());
+    println!("待判断：{} 条（共 {} 条）", pending.len(), items.len());
+    if pending.is_empty() {
+        println!("没有需要模型判断的条目。");
+        return Ok(());
+    }
+    if !cfg.is_local() {
+        println!("注意：这是云端模式，条目信息（已去标识化）会离开本机。");
+    }
+
+    let client = llm::Client::new(cfg);
+    let suggestions = client.classify(&pending, &candidate_groups())?;
+
+    if json {
+        let payload = serde_json::json!({
+            "suggestions": suggestions.iter().map(|s| serde_json::json!({
+                "file": s.file_name,
+                "group": s.group,
+                "reason": s.reason,
+            })).collect::<Vec<_>>(),
+        });
+        println!("{}", serde_json::to_string_pretty(&payload)?);
+        return Ok(());
+    }
+
+    println!("{}", "-".repeat(76));
+    let mut unsure = 0;
+    for s in &suggestions {
+        match &s.group {
+            Some(g) => println!("{:<28} → {:<6} {}", s.file_name, g, s.reason),
+            None => {
+                unsure += 1;
+                println!("{:<28} → 模型也拿不准    {}", s.file_name, s.reason);
+            }
+        }
+    }
+    println!("{}", "-".repeat(76));
+    println!(
+        "给出判断 {} 条，拿不准 {unsure} 条。拿不准的会留在桌面，不会瞎猜。",
+        suggestions.len() - unsure
+    );
+    Ok(())
+}
+
+// ---------------------------------------------------------------- 自描述
+
+fn describe() -> anyhow::Result<()> {
+    let catalog = serde_json::json!({
+        "name": "deskagent",
+        "version": env!("CARGO_PKG_VERSION"),
+        "purpose": "给桌面整理器装上语义大脑：读取桌面图标，判断每个是什么，编译成 PecoFence 能执行的动作",
+        "requires": {
+            "pecofence-cli": "M1 及之后的部分命令需要；缺省时 scan/classify/plan/rules/resolve 仍可用",
+            "curl": "仅 --llm 相关命令需要，Windows 10 1803+ 自带",
+        },
+        "environment": {
+            "PECOFENCE_CLI": "pecofence-cli 可执行文件路径，缺省从 PATH 查找",
+            "DESKAGENT_LLM_BASE_URL": "OpenAI 兼容接口的基址，如 http://127.0.0.1:11434/v1",
+            "DESKAGENT_LLM_MODEL": "模型名，缺省 gpt-4o-mini",
+            "DESKAGENT_LLM_API_KEY": "云端模式需要；本地回环地址不需要",
+            "DESKAGENT_LLM_TIMEOUT": "秒，缺省 60",
+        },
+        "commands": [
+            {"name": "scan", "args": ["--dir <DIR>...", "--json"], "effect": "read-only",
+             "desc": "扫描目录，输出条目与元数据覆盖"},
+            {"name": "classify", "args": ["--dir <DIR>...", "--json"], "effect": "read-only",
+             "desc": "扫描并分类"},
+            {"name": "plan", "args": ["--dir <DIR>...", "--min-items <N>", "--llm", "--json"], "effect": "read-only",
+             "desc": "生成整理方案，不触碰系统"},
+            {"name": "rules", "args": ["--dir <DIR>...", "--json"], "effect": "read-only",
+             "desc": "推导可沉淀成持久规则的扩展名规则"},
+            {"name": "apply", "args": ["--dir <DIR>...", "--min-items <N>", "--area <RECT>", "--with-rules", "--llm", "--dry-run", "--yes"], "effect": "mutates",
+             "desc": "建栅栏并搬运图标；无 --yes 时只 dry-run"},
+            {"name": "watch", "args": ["--once"], "effect": "mutates",
+             "desc": "常驻守护，新图标出现即分类归位"},
+            {"name": "resolve", "args": ["--dir <DIR>...", "--all", "--json"], "effect": "network",
+             "desc": "让模型给规则未覆盖的条目补判断"},
+            {"name": "eval", "args": ["--dir <DIR>...", "--input <JSON>", "--labels <YAML>", "--rules <YAML>", "--split dev|test|all", "--json"], "effect": "read-only",
+             "desc": "用带标注的样本评测规则包"},
+            {"name": "bench", "args": ["--dir <DIR>...", "--input <JSON>", "--labels <YAML>", "--assume-accuracy <P>", "--json"], "effect": "read-only",
+             "desc": "对照实验：手写规则与模型各需多少次人工操作"},
+            {"name": "describe", "args": [], "effect": "read-only", "desc": "本目录"},
+            {"name": "skill", "args": [], "effect": "read-only", "desc": "给编码 agent 的使用指南"},
+        ],
+        "safety": [
+            "apply 在修改前一定先 snapshot save，输出里给出回滚命令",
+            "apply 不复用 portal 栅栏：portal 背后是真实文件夹，item move 会移动真实文件",
+            "模型只上传去标识化字段，路径仅保留产品段，不含用户名",
+            "模型给出不存在的分组名会被丢弃，不会去创建不存在的栅栏",
+        ],
+    });
+    println!("{}", serde_json::to_string_pretty(&catalog)?);
+    Ok(())
+}
+
+fn skill() -> anyhow::Result<()> {
+    println!("{SKILL_TEXT}");
+    Ok(())
+}
+
+const SKILL_TEXT: &str = r#"# deskagent
+
+给桌面整理器装上语义大脑。读取桌面图标，判断每个是什么，编译成 PecoFence 能执行的动作。
+
+## 什么时候用
+
+用户说「整理我的桌面」「把这些图标分一下类」「新装的软件又乱在桌面上了」时。
+
+不要用它移动文件内容——它只改变图标属于哪个栅栏。
+
+## 推荐的调用顺序
+
+1. `deskagent plan` —— 先看方案。这一步不改任何东西，可以放心跑。
+2. 把方案念给用户确认。分组名、每组的条目数、哪些留在桌面。
+3. `deskagent apply` —— 仍然只是 dry-run，打印将要执行的 pecofence-cli 动作。
+4. 用户明确同意后，`deskagent apply --yes`。
+5. 记下输出里的快照 id。用户不满意时 `pecofence-cli snapshot restore <id>` 回滚。
+
+永远不要跳过第 2 步直接 --yes。这会改变用户桌面。
+
+## 常见需求
+
+- 「顺便让以后新装的也自动归位」→ `apply --yes --with-rules`，
+  然后提醒用户打开 PecoFence 的「新条目自动归档」，或让 `deskagent watch` 常驻。
+- 「有些不认识的图标没分类」→ `deskagent resolve`，把模型的判断念给用户，
+  用户认可后再跑 `plan --llm`。
+- 「这个分类不对」→ 不要改规则包。直接告诉用户可以在 PecoFence 里拖一次，
+  或者用 `pecofence-cli item move <路径> --to <栅栏>`。
+
+## 输出怎么读
+
+- `plan` 的「留在桌面」是故意的，不是失败：规则没覆盖，或该组条目太少不值得单独开栅栏。
+- `rules` 输出的「可沉淀成持久规则」是扩展名类判断。快捷方式类判断无法规则化，
+  因为 PecoFence 的条件里没有公司名和目标路径。这部分只能靠 `watch` 守护。
+
+## 不要做的事
+
+- 不要在没有 --yes 的情况下声称已经整理好了。
+- 不要把 portal 栅栏当目标：portal 背后是磁盘上的真实文件夹，往里搬会移动真实文件。
+  deskagent 已经会跳过它们，但你手动调 pecofence-cli 时要自己注意。
+- 不要用 --llm 时假设数据不出本机。本地模式（127.0.0.1）才不出；
+  云端模式会把去标识化后的条目信息发出去，先问用户。
+"#;
+
+// ---------------------------------------------------------------- 对照实验
+
+fn bench(
+    dirs: &[PathBuf],
+    input: Option<&Path>,
+    labels_path: &Path,
+    assume_accuracy: Option<f64>,
+    json: bool,
+) -> anyhow::Result<()> {
+    let items = match input {
+        Some(p) => load_json_items(p)?,
+        None => collect(dirs)?,
+    };
+    let pack = RulePack::from_yaml(BUILTIN_RULES)?;
+    let raw = std::fs::read_to_string(labels_path)?;
+    let labels: Labels = serde_yaml::from_str(&raw)?;
+
+    let labeled: Vec<Item> = items
+        .iter()
+        .filter(|i| labels.labels.contains_key(&i.file_name))
+        .cloned()
+        .collect();
+    let n = labeled.len();
+    if n == 0 {
+        anyhow::bail!("标注文件里没有一条能对上样本，检查键是否用了文件名");
+    }
+
+    // ---- 手写规则侧
+    //
+    // 不能只数「规则条数」：PecoFence 的条件里没有公司名、没有快捷方式目标路径，
+    // 而快捷方式的分类恰好全靠这两样。所以要把条目分成两拨：
+    //   能写成规则的 → 成本是规则条数（一条规则可覆盖多条同扩展名条目）
+    //   写不成规则的 → 只能人工拖一次，一条算一次操作
+    let mut ext_groups: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for item in &labeled {
+        if deskagent_compile::rules::is_semantic_ext(&item.ext) {
+            continue;
+        }
+        if let Some((_, group, _)) = pack.classify_with_rule(item) {
+            ext_groups.entry(item.ext.clone()).or_default().insert(group);
+        }
+    }
+    // 只保留「一个扩展名只对应一个分组」的，其余本身不携带分类信息
+    let expressible: BTreeSet<String> = ext_groups
+        .iter()
+        .filter(|(_, gs)| gs.len() == 1)
+        .map(|(e, _)| e.clone())
+        .collect();
+    let rule_groups: BTreeSet<String> = ext_groups
+        .iter()
+        .filter(|(_, gs)| gs.len() == 1)
+        .flat_map(|(_, gs)| gs.iter().cloned())
+        .collect();
+
+    let mut rule_covered = 0usize;
+    let mut rule_correct = 0usize;
+    let mut manual = 0usize;
+    for item in &labeled {
+        let by_rule = expressible.contains(&item.ext);
+        if !by_rule {
+            // 规则表达不了，用户只能自己拖
+            manual += 1;
+            continue;
+        }
+        if let Some((_, group, _)) = pack.classify_with_rule(item) {
+            rule_covered += 1;
+            if labels.labels[&item.file_name] == group {
+                rule_correct += 1;
+            }
+        }
+    }
+    // 每条规则一次 `rule add`，加上每条只能手拖的条目
+    let rule_ops = (rule_groups.len() + manual) as f64;
+
+    // ---- 模型侧：一次确认 + 需要人工纠正的条目数
+    let (ai_ops, ai_accuracy, source) = if let Some(p) = assume_accuracy {
+        if !(0.0..=1.0).contains(&p) {
+            anyhow::bail!("--assume-accuracy 应在 0 到 1 之间");
+        }
+        (1.0 + n as f64 * (1.0 - p), p, "假设值".to_string())
+    } else {
+        let cfg = llm::Config::from_env().ok_or_else(|| {
+            anyhow::anyhow!(
+                "需要 --assume-accuracy <P> 估算，或配置模型实测（DESKAGENT_LLM_BASE_URL）"
+            )
+        })?;
+        let client = llm::Client::new(cfg.clone());
+        let suggestions = client.classify(&labeled, &candidate_groups())?;
+        let mut wrong = 0usize;
+        for item in &labeled {
+            let got = suggestions
+                .iter()
+                .find(|s| s.file_name == item.file_name)
+                .and_then(|s| s.group.clone());
+            if got.as_deref() != Some(labels.labels[&item.file_name].as_str()) {
+                wrong += 1;
+            }
+        }
+        let acc = ratio(n - wrong, n);
+        (
+            1.0 + wrong as f64,
+            acc,
+            format!("实测，{}", cfg.describe_mode()),
+        )
+    };
+
+    let threshold = rule_ops * 0.5;
+    let passed = ai_ops <= threshold;
+
+    if json {
+        let payload = serde_json::json!({
+            "sample": n,
+            "rule_side": {
+                "operations": rule_ops,
+                "rule_count": rule_groups.len(),
+                "rule_covered": rule_covered,
+                "manual_drags": manual,
+                "accuracy": ratio(rule_correct, rule_covered),
+            },
+            "ai_side": {
+                "operations": ai_ops,
+                "accuracy": ai_accuracy,
+                "source": source,
+            },
+            "threshold": threshold,
+            "passed": passed,
+        });
+        println!("{}", serde_json::to_string_pretty(&payload)?);
+        return Ok(());
+    }
+
+    println!("样本 {n} 条（带标注）");
+    println!("{}", "-".repeat(76));
+    println!("手写规则侧");
+    if rule_covered == 0 {
+        println!("    能写成规则：0 条 —— PecoFence 的条件表达不了这些条目");
+    } else {
+        println!(
+            "    能写成规则：{rule_covered} 条，需要 {} 条规则，准确率 {}%",
+            rule_groups.len(),
+            pct(rule_correct, rule_covered)
+        );
+    }
+    println!("    写不成规则：{manual} 条（快捷方式等，PecoFence 条件表达不了，只能手拖）");
+    println!("    成本 = {} 条规则 + {manual} 次拖拽 = {rule_ops} 次操作", rule_groups.len());
+    println!("模型侧");
+    println!("    准确率 {}%（{source}）", (ai_accuracy * 100.0).round());
+    println!("    成本 = {ai_ops:.1} 次操作（1 次确认 + 每条判错/判不出的纠正）");
+    println!("{}", "-".repeat(76));
+    println!(
+        "判定线：模型侧 ≤ 手写规则侧 × 50% = {threshold:.1}；实际 {ai_ops:.1} → {}",
+        if passed { "达标" } else { "未达标" }
+    );
+    if rule_ops > 0.0 {
+        // 反推：模型准确率掉到多少就不划算了
+        let need = 1.0 - (threshold - 1.0) / n as f64;
+        if need > 0.0 {
+            println!("临界点：模型准确率需高于 {}%，低于这个数就不如手写规则", (need * 100.0).round());
+        }
+    }
+    println!();
+    println!("口径说明：");
+    println!("    规则侧把「PecoFence 写不出来的判断」折成人工拖拽，一条算一次操作。");
+    println!("    这一步不能省：只数规则条数会严重低估成本，因为快捷方式的分类全靠");
+    println!("    目标路径和公司名，而 PecoFence 的条件里没有这两个。");
+    println!("    模型侧把每条判错或判不出的条目都算一次人工纠正。");
+    println!("    这个口径只看人工操作次数，不看时间，也不看规则写错后的返工成本。");
     Ok(())
 }
 

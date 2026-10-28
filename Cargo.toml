@@ -5,6 +5,7 @@ members = [
     "crates/classify",
     "crates/compile",
     "crates/pecofence",
+    "crates/llm",
     "crates/cli",
 ]
 

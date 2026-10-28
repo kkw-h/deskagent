@@ -13,6 +13,7 @@ deskagent-scan = { path = "../scan" }
 deskagent-classify = { path = "../classify" }
 deskagent-compile = { path = "../compile" }
 deskagent-pecofence = { path = "../pecofence" }
+deskagent-llm = { path = "../llm" }
 anyhow.workspace = true
 clap.workspace = true
 serde.workspace = true
