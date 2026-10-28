@@ -90,6 +90,36 @@ powershell -File scripts/make-windows.ps1 -Format Installer -Repository kkw-h/de
 - 安装包脚本只收 `dist` 里列出的文件；`WebView2Loader.dll` 和
   `THIRD-PARTY-LICENSES.txt` 由 `make-windows.ps1` 现生成。
 
+### 发一个新版本（应用内更新）
+
+应用内更新认的是**本仓库**的 release（`crates/core/src/updates.rs` 的 `REPOSITORY`）：
+
+```
+检查  https://api.github.com/repos/kkw-h/deskagent/releases/latest
+下载  https://github.com/kkw-h/deskagent/releases/download/v<版本>/pecofence-v<版本>-x64-setup.exe
+```
+
+所以仓库必须是公开的（私有仓库的 release 下载要 token，程序里没法带）。发版三步：
+
+```powershell
+# 1. 改 Cargo.toml 的 workspace version，重新构建安装包（脚本会校验 ProductVersion 与之一致）
+powershell -File scripts/make-windows.ps1 -Format Installer -Repository kkw-h/deskagent `
+  -TargetDir C:/Users/<you>/cargo-target/package
+
+# 2. 打 tag（必须和版本号一致，带 v 前缀）
+git tag -a v0.3.0 -m "PecoFence 0.3.0" && git push origin v0.3.0
+
+# 3. 发 release，资产名必须是 pecofence-v<版本>-x64-setup.exe（应用按这个名字找）
+gh release create v0.3.0 dist/pecofence-v0.3.0-x64-setup.exe `
+  dist/pecofence-v0.3.0-x64-setup.exe.sha256 --title "0.3.0" --notes-file notes.md
+```
+
+两个注意点：
+
+- 资产名或下载地址对不上时，应用**不会**去别处下载（只在 `releases/download/<tag>/` 下找），
+  release 仍在但只会打开页面。
+- GitHub API 的响应带 `max-age=60`，刚发完版的一分钟内「检查更新」可能还看到旧结果。
+
 ## DeskAgent 融入了什么
 
 不是把两个二进制放进一个仓库，而是三处实质性改动。
