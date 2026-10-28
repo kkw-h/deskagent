@@ -621,6 +621,16 @@ impl App {
     /// Moves items into `to`. Virtual fences only change membership (files stay put); a portal
     /// as source or target means a real file move (portal = folder view).
     pub(super) fn move_items(&mut self, items: &[ItemId], to: FenceId) {
+        self.move_items_inner(items, to, true);
+    }
+
+    /// The same move from an API caller (`items.move`): a script or an agent re-filing items is
+    /// not the user's own judgement, so it does not feed the learning table.
+    pub(super) fn move_items_from_api(&mut self, items: &[ItemId], to: FenceId) {
+        self.move_items_inner(items, to, false);
+    }
+
+    fn move_items_inner(&mut self, items: &[ItemId], to: FenceId, learn: bool) {
         if self.state.portal_path(to).is_some() {
             // Namespace items cannot be moved into a folder; they stay where they are.
             let paths: Vec<PathBuf> = items
@@ -653,7 +663,9 @@ impl App {
             for id in affected {
                 self.refresh_fence(id);
             }
-            self.learn_from_move(&desktop_items, to);
+            if learn {
+                self.learn_from_move(&desktop_items, to);
+            }
             self.schedule_save();
         }
     }

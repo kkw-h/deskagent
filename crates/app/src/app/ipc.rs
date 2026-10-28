@@ -2019,7 +2019,8 @@ impl App {
             .flatten();
         // Portal sources / targets move real files on a worker thread; the fences update when
         // the shell reports back.
-        self.move_items(&accepted, to);
+        // A script or agent re-filing items is not the user's own judgement: no learning.
+        self.move_items_from_api(&accepted, to);
         self.push_settings_state();
         Ok(mutation(
             true,
