@@ -1,41 +1,98 @@
 [workspace]
-resolver = "2"
+# resolver 3 是 PecoFence 的要求（edition 2024）；deskagent 的 crate 显式声明
+# edition 2021，在 resolver 3 下正常工作。
+resolver = "3"
 members = [
+    # PecoFence 原有成员
+    "crates/core",
+    "crates/platform",
+    "crates/render",
+    "crates/app",
+    "crates/watchdog",
+    "crates/ipc",
+    "crates/cli",
+    "tools/bindgen",
+    # deskagent 并入的分类能力
     "crates/scan",
     "crates/classify",
     "crates/compile",
-    "crates/pecofence",
     "crates/llm",
-    "crates/cli",
+    "crates/deskagent",
 ]
 
 [workspace.package]
-version = "0.1.0"
-edition = "2021"
-license = "MIT"
-authors = ["Han Di"]
+# 版本以 PecoFence 为准：合并后主产品是 PecoFence，deskagent 是它的分类模块。
+version = "0.2.3"
+edition = "2024"
+rust-version = "1.95"
+# 仓库含 Apache-2.0 的 PecoFence 代码，整体随之改为 Apache-2.0。
+license = "Apache-2.0"
+authors = ["Han Di", "PecoFence contributors"]
 
 [workspace.dependencies]
-anyhow = "1"
-thiserror = "2"
+# ---- PecoFence 的 Windows 依赖（需要 MSVC 工具链）----
+windows-core = "0.100"
+windows-numerics = "0.100"
+windows-window = "0.100"
+windows-canvas = { version = "0.100", features = ["composition"] }
+windows-composition = { version = "0.100", features = ["system"] }
+windows-webview = "0.100"
+windows-bindgen = "0.100"
+
+# ---- 两边共用 ----
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# ---- PecoFence 独有 ----
+uuid = { version = "1", features = ["v4", "serde"] }
+schemars = { version = "1", features = ["uuid1"] }
+
+# clap 用 PecoFence 的配置（含 wrap_help）。deskagent 原本为了避开
+# anstyle-wincon → windows-sys 而关掉了默认特性，那是 GNU 工具链下的妥协；
+# 合并后构建统一走 MSVC，这个限制不再需要。
+clap = { version = "4", features = ["derive", "wrap_help"] }
+
+# ---- deskagent 独有 ----
+anyhow = "1"
+thiserror = "2"
 serde_yaml = "0.9"
 encoding_rs = "0.8"
-tracing = "0.1"
 pelite = "0.10"
 
-# 关掉 color 特性，避免引入 anstyle-wincon → windows-sys
-# 后者在 GNU 工具链下需要 dlltool，而 rustup 的 rust-mingw 组件不提供
-clap = { version = "4", default-features = false, features = [
-    "std",
-    "derive",
-    "help",
-    "usage",
-    "error-context",
-] }
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "warn"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "allow"
+too_many_arguments = "allow"
+manual_range_contains = "allow"
+type_complexity = "allow"
+collapsible_if = "allow"
+len_without_is_empty = "allow"
+manual_slice_size_calculation = "allow"
+manual_div_ceil = "allow"
+
+# Vendored copy of the upstream 0.100.0 crate with two additions (`Visual::as_raw`,
+# `Compositor::as_raw` on the `system` stack) so `crates/render` can reach Composition APIs the
+# wrapper does not expose. Drop the patch once upstream ships an equivalent accessor.
+#
+# windows-canvas: vendored 0.100.0 with `TextFormat::with_locale` (upstream hard-codes `en-us`,
+# which makes DirectWrite draw Chinese file names with the Japanese UI font).
+[patch.crates-io]
+windows-composition = { path = "vendor/windows-composition" }
+windows-canvas = { path = "vendor/windows-canvas" }
 
 [profile.release]
-lto = true
+opt-level = 3
+lto = "fat"
 codegen-units = 1
-strip = true
+panic = "abort"
+# Symbols stay in the .pdb next to the exe (not shipped) so a crash offset from WER or
+# platform::crashlog can be symbolized after the fact; the exe itself carries no debug info.
+strip = false
+debug = "line-tables-only"
+
+[profile.dev]
+opt-level = 1

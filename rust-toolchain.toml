@@ -1,0 +1,5 @@
+[toolchain]
+channel = "stable"
+# 不在这里声明 components：rustup 每次进项目目录都会校验并尝试补装，
+# 本机已手工装过 clippy/rustfmt，重复安装会因 bin\cargo-clippy.exe 冲突而中断。
+targets = ["x86_64-pc-windows-msvc"]

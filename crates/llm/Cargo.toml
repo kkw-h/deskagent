@@ -1,7 +1,9 @@
 [package]
 name = "deskagent-llm"
 version.workspace = true
-edition.workspace = true
+# 显式声明 2021：workspace 默认是 2024（PecoFence 要求），
+# 这些 crate 是 deskagent 原有代码，升 edition 需要单独验证。
+edition = "2021"
 license.workspace = true
 
 [dependencies]
