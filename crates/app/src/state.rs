@@ -1786,11 +1786,16 @@ impl AppState {
     }
 
     pub fn rename_fence(&mut self, id: FenceId, title: &str) {
+        let old = self.fence(id).map(|f| f.title.clone());
         if let Some(f) = self.fence_mut(id)
             && f.title != title
         {
             f.title = title.to_string();
             self.dirty = true;
+            // 学习记录按标题存：栅栏改名后旧标题就没人认了，会让语义下次凭空建一个旧栅栏。
+            if let Some(old) = old {
+                self.config.learnings.rename_group(&old, title);
+            }
         }
     }
 

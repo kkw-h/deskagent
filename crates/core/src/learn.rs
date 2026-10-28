@@ -76,6 +76,22 @@ impl Learnings {
         before - self.len()
     }
 
+    /// 栅栏改名：记忆跟着一起改，否则旧标题会被当成一个新分组。返回改动的条数。
+    pub fn rename_group(&mut self, old: &str, new: &str) -> usize {
+        let mut changed = 0;
+        for group in self
+            .by_company
+            .values_mut()
+            .chain(self.by_name.values_mut())
+        {
+            if group == old {
+                *group = new.to_string();
+                changed += 1;
+            }
+        }
+        changed
+    }
+
     pub fn clear(&mut self) {
         self.by_company.clear();
         self.by_name.clear();
@@ -138,6 +154,17 @@ mod tests {
         learn.remember("Zed", "Zed.exe", "开发");
         assert_eq!(learn.forget_group("游戏"), 2);
         assert_eq!(learn.lookup("Valve", "Steam.lnk"), None);
+        assert_eq!(learn.lookup("Zed", "Zed.exe"), Some("开发"));
+    }
+
+    #[test]
+    fn renaming_a_fence_moves_its_memories() {
+        let mut learn = Learnings::default();
+        learn.remember("Valve", "Steam.lnk", "游戏");
+        learn.remember("", "mystery.exe", "游戏");
+        learn.remember("Zed", "Zed.exe", "开发");
+        assert_eq!(learn.rename_group("游戏", "Games"), 2);
+        assert_eq!(learn.lookup("Valve", "Steam.lnk"), Some("Games"));
         assert_eq!(learn.lookup("Zed", "Zed.exe"), Some("开发"));
     }
 }
