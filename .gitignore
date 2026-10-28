@@ -33,3 +33,6 @@ desktop.ini
 
 # 评测用生成数据（可脚本重建）
 eval/*.json
+
+# 临时假 CLI 的调用日志
+fake.log
