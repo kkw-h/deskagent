@@ -54,6 +54,23 @@ cargo build -p pecofence       # 只构建 GUI
 cargo test --workspace
 ```
 
+### 安装到本机
+
+```powershell
+cargo build --release -p pecofence -p pecofence-cli -p pecofence-watchdog
+powershell -File scripts/install.ps1
+```
+
+装到 `%LOCALAPPDATA%\Programs\PecoFence`，创建开始菜单快捷方式，并写入开机自启
+（`HKCU\…\Run\PecoFence`）。`-NoAutostart` 跳过自启，`-Uninstall` 卸载
+（配置和桌面图标状态保留，`-Uninstall -Purge` 一并清掉）。
+
+`WebView2Loader.dll` 由脚本从 `third_party/webview2` 复制过去——它由程序启动时导入，
+必须和 exe 同目录，Cargo 不会帮你拷。`pecofence-watchdog.exe` 也要一起放，否则崩溃时
+没人把隐藏的桌面图标放回来。
+
+配置在 `%APPDATA%\PecoFence\config.json`；`--portable` 则用 exe 旁边的 `config\`。
+
 ## DeskAgent 融入了什么
 
 不是把两个二进制放进一个仓库，而是三处实质性改动。
