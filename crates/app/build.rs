@@ -38,6 +38,11 @@ fn main() {
     };
 
     let rc_path = out_dir.join("pecofence.rc");
+    // rc.exe 用 ANSI 代码页解析 .rc 文件，图标路径里只要有非 ASCII 字符就会读不到文件
+    // 而以 exit code 1 失败（项目放在中文目录下就是这种情况，图标会静默丢失）。
+    // OUT_DIR 在 target-dir 下，通常是纯 ASCII，所以先把图标复制过去再引用。
+    // 复制失败就退回原路径：宁可没有图标，也不要因此构建失败。
+    let ico = copy_icon(&ico, &out_dir).unwrap_or(ico);
     std::fs::write(&rc_path, rc_source(&ico)).expect("write .rc");
     let res_path = out_dir.join("pecofence.res");
     // /nologo, /fo output; no /i needed because the script includes no headers.
@@ -101,6 +106,16 @@ const SEGMENT_HEAP_MANIFEST: &str = r#"<?xml version="1.0" encoding="UTF-8" stan
 "#;
 
 /// The resource script: icon 1 plus a VERSIONINFO block derived from the Cargo manifest.
+/// Copy the icon next to the `.rc` so `rc.exe` sees an ASCII path.
+///
+/// Returns `None` when the copy fails (for instance when `OUT_DIR` is on a path
+/// `rc.exe` cannot handle either); the caller then keeps the original path.
+fn copy_icon(src: &Path, out_dir: &Path) -> Option<PathBuf> {
+    let dst = out_dir.join("pecofence.ico");
+    std::fs::copy(src, &dst).ok()?;
+    Some(dst)
+}
+
 fn rc_source(ico: &Path) -> String {
     let ver = |k: &str| env::var(format!("CARGO_PKG_VERSION_{k}")).unwrap_or_else(|_| "0".into());
     let (major, minor, patch) = (ver("MAJOR"), ver("MINOR"), ver("PATCH"));
