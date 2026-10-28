@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>桌面图标整理工具 · 产品方案 v0.2</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background:#FAFAF8; color:#1F1F1D; line-height:1.7; font-size:14px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:960px; margin:0 auto; padding:56px 32px 80px; }
+
+  header { border-bottom:1px solid #E5E3DC; padding-bottom:32px; margin-bottom:44px; }
+  .eyebrow { font-size:12px; letter-spacing:.08em; color:#888780; text-transform:uppercase; margin-bottom:14px; }
+  h1 { font-size:30px; font-weight:600; letter-spacing:-.01em; margin-bottom:14px; }
+  .lead { font-size:16px; color:#5F5E5A; max-width:640px; }
+  .lead strong { color:#1F1F1D; font-weight:600; }
+
+  section { margin-bottom:52px; }
+  h2 { font-size:13px; font-weight:600; letter-spacing:.06em; color:#888780; text-transform:uppercase; margin-bottom:22px; display:flex; align-items:center; gap:10px; }
+  h2::after { content:""; flex:1; height:1px; background:#E5E3DC; }
+
+  .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .card { background:#fff; border:1px solid #E5E3DC; border-radius:12px; padding:22px 20px; }
+  .card .num { font-size:11px; font-weight:600; color:#7F77DD; letter-spacing:.06em; margin-bottom:10px; }
+  .card h3 { font-size:15px; font-weight:600; margin-bottom:10px; line-height:1.5; }
+  .card p { font-size:13px; color:#5F5E5A; line-height:1.65; }
+  .card p + p { margin-top:8px; }
+  .card .hl { color:#534AB7; font-weight:500; }
+
+  .decisions { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .dec { background:#fff; border:1px solid #E5E3DC; border-radius:10px; padding:16px 18px; }
+  .dec .k { font-size:11px; color:#888780; letter-spacing:.04em; margin-bottom:6px; }
+  .dec .v { font-size:14px; font-weight:600; }
+  .dec .v.rust { color:#993C1D; }
+
+  .layers { display:flex; flex-direction:column; gap:8px; }
+  .layer { display:flex; align-items:center; gap:18px; background:#fff; border:1px solid #E5E3DC; border-radius:10px; padding:15px 20px; }
+  .layer .tag { font-size:11px; font-weight:600; color:#fff; background:#444441; border-radius:5px; padding:3px 8px; flex-shrink:0; letter-spacing:.04em; }
+  .layer.agent .tag { background:#534AB7; }
+  .layer .name { font-size:14px; font-weight:600; width:96px; flex-shrink:0; }
+  .layer .desc { font-size:13px; color:#5F5E5A; }
+  .layer.agent { border-color:#CECBF6; background:#FCFCFF; }
+
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .panel { background:#fff; border:1px solid #E5E3DC; border-radius:12px; padding:22px; }
+  .panel h3 { font-size:14px; font-weight:600; margin-bottom:6px; }
+  .panel .sub { font-size:12px; color:#888780; margin-bottom:16px; }
+  .panel ul { list-style:none; }
+  .panel li { font-size:13px; color:#5F5E5A; padding:7px 0 7px 16px; position:relative; }
+  .panel li::before { content:""; position:absolute; left:0; top:15px; width:5px; height:5px; border-radius:50%; background:#CECBF6; }
+  .panel li b { color:#1F1F1D; font-weight:600; }
+
+  .box-demo { background:#F4F2EC; border-radius:10px; padding:20px; margin-top:14px; }
+  .fence { background:rgba(83,74,183,.06); border:1px dashed #AFA9EC; border-radius:8px; padding:10px 12px; }
+  .fence .fhead { font-size:11px; font-weight:600; color:#534AB7; margin-bottom:9px; display:flex; justify-content:space-between; }
+  .icons { display:flex; gap:8px; }
+  .ic { width:26px; height:26px; border-radius:6px; background:#fff; border:1px solid #E0DED6; }
+
+  .flow { background:#fff; border:1px solid #E5E3DC; border-radius:12px; padding:24px; }
+  .step { display:flex; gap:14px; align-items:flex-start; padding:10px 0; }
+  .step + .step { border-top:1px dashed #EDEBE4; }
+  .step .dot { width:22px; height:22px; border-radius:50%; background:#EEEDFE; color:#534AB7; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+  .step code { font-family:ui-monospace, "SF Mono", Consolas, monospace; font-size:12.5px; background:#F4F2EC; padding:2px 7px; border-radius:4px; color:#3C3489; }
+  .step .txt { font-size:13px; color:#5F5E5A; }
+  .step .txt b { color:#1F1F1D; font-weight:600; }
+
+  .road { position:relative; padding-left:26px; }
+  .road::before { content:""; position:absolute; left:6px; top:8px; bottom:8px; width:1px; background:#E5E3DC; }
+  .mile { position:relative; padding-bottom:26px; }
+  .mile:last-child { padding-bottom:0; }
+  .mile::before { content:""; position:absolute; left:-24px; top:7px; width:9px; height:9px; border-radius:50%; background:#fff; border:2px solid #B4B2A9; }
+  .mile.key::before { border-color:#534AB7; background:#534AB7; }
+  .mile h3 { font-size:14px; font-weight:600; margin-bottom:5px; }
+  .mile h3 span { font-size:12px; font-weight:400; color:#888780; margin-left:8px; }
+  .mile p { font-size:13px; color:#5F5E5A; }
+  .mile p b { color:#1F1F1D; }
+
+  .stack { background:#fff; border:1px solid #E5E3DC; border-radius:12px; overflow:hidden; }
+  .stack .row { display:flex; align-items:center; gap:16px; padding:13px 20px; border-bottom:1px solid #F1EFE8; }
+  .stack .row:last-child { border-bottom:none; }
+  .stack .row.hi { background:#FCFCFF; }
+  .stack .p { font-family:ui-monospace, "SF Mono", Consolas, monospace; font-size:12.5px; color:#3C3489; width:150px; flex-shrink:0; }
+  .stack .d { font-size:13px; color:#5F5E5A; }
+  .stack .s { margin-left:auto; font-size:11px; font-weight:600; color:#888780; flex-shrink:0; }
+
+  .note { margin-top:44px; padding:18px 20px; background:#FAEEDA; border-radius:10px; font-size:13px; color:#633806; }
+  .note b { font-weight:600; }
+
+  @media (max-width:760px) {
+    .wrap { padding:36px 20px 60px; }
+    .cards, .decisions, .two { grid-template-columns:1fr; }
+    .layer { flex-wrap:wrap; gap:10px; }
+    .layer .name { width:auto; }
+    .stack .row { flex-wrap:wrap; gap:6px; }
+    .stack .p { width:auto; }
+    .stack .s { margin-left:0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">产品方案 · v0.2 决策落定</div>
+    <h1>桌面图标整理工具</h1>
+    <p class="lead">让 Agent 看懂你的桌面，然后把它重新摆好。<strong>布局与移动都做，但始终分开呈现</strong>——用户永远知道自己即将失去什么控制权。</p>
+  </header>
+
+  <section>
+    <h2>已定决策</h2>
+    <div class="decisions">
+      <div class="dec"><div class="k">01 首版范围</div><div class="v">布局 + 移动</div></div>
+      <div class="dec"><div class="k">02 LLM 接入</div><div class="v">云端 + 本地</div></div>
+      <div class="dec"><div class="k">03 分组命名</div><div class="v">自由命名 + 收敛</div></div>
+      <div class="dec"><div class="k">04 桌面收纳盒</div><div class="v">做，两档形态</div></div>
+      <div class="dec"><div class="k">05 技术栈</div><div class="v rust">Rust</div></div>
+      <div class="dec"><div class="k">06 显示器</div><div class="v">仅主屏</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>四条设计原则</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="num">原则 01</div>
+        <h3>两层动作，风险分级</h3>
+        <p>布局改坐标，零风险、秒回滚；移动改文件系统，需逐条确认。</p>
+        <p>两者都做，但<span class="hl">预览里用不同视觉标识分开呈现</span>。</p>
+      </div>
+      <div class="card">
+        <div class="num">原则 02</div>
+        <h3>LLM 只做判断，不做动作</h3>
+        <p>Agent 输出分类方案 JSON，动作由确定性代码执行。</p>
+        <p>幻觉最多导致分类不准，<span class="hl">不会导致文件丢失</span>。</p>
+      </div>
+      <div class="card">
+        <div class="num">原则 03</div>
+        <h3>收纳盒视觉优先</h3>
+        <p>默认只框住图标，文件一个都不动。可选升级为物理收纳。</p>
+        <p>这个默认值决定<span class="hl">第一印象：打开就能用，不怕</span>。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>收纳盒：两档形态</h2>
+    <div class="two">
+      <div class="panel">
+        <h3>轻收纳盒（默认）</h3>
+        <div class="sub">视觉容器 · 不移动任何文件</div>
+        <ul>
+          <li><b>半透明圆角底板</b>，顶部标题栏显示名称与图标数</li>
+          <li>可拖动、缩放、<b>折叠</b>（折叠后只留标题栏）</li>
+          <li>双击标题栏改名，右键改色 / 解散</li>
+          <li>图标坐标被约束在容器内，<b>文件零改动</b></li>
+        </ul>
+        <div class="box-demo">
+          <div class="fence">
+            <div class="fhead"><span>游戏</span><span>9</span></div>
+            <div class="icons">
+              <div class="ic"></div><div class="ic"></div><div class="ic"></div>
+              <div class="ic"></div><div class="ic"></div><div class="ic"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>重收纳盒（可选）</h3>
+        <div class="sub">物理收纳 · 需明确确认</div>
+        <ul>
+          <li>在 <b>Desktop/</b> 下建真实文件夹，文件移入</li>
+          <li>移动前检查：占用、路径长度、进程引用</li>
+          <li>逐条列出待移动文件，确认后执行</li>
+          <li>全程记录源路径，<b>可完整回滚</b></li>
+        </ul>
+        <div class="box-demo">
+          <div class="fence" style="border-style:solid;border-color:#EF9F27;background:rgba(239,159,39,.06)">
+            <div class="fhead" style="color:#854F0B"><span>游戏/ · 物理文件夹</span><span>9</span></div>
+            <div class="icons">
+              <div class="ic"></div><div class="ic"></div><div class="ic"></div>
+              <div class="ic"></div><div class="ic"></div><div class="ic"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>功能分层</h2>
+    <div class="layers">
+      <div class="layer">
+        <span class="tag">L1</span>
+        <span class="name">采集</span>
+        <span class="desc">桌面枚举 · 快捷方式深解析（目标路径 + PE 版本 + 签名）· 图标提取 · 坐标快照</span>
+      </div>
+      <div class="layer">
+        <span class="tag">L2</span>
+        <span class="name">理解</span>
+        <span class="desc">信号加权 · 规则引擎（离线）· 语义引擎（云端 / Ollama）· 自由命名收敛 · 修正学习</span>
+      </div>
+      <div class="layer">
+        <span class="tag">L3</span>
+        <span class="name">布局</span>
+        <span class="desc">分区规划 · 收纳盒（轻 / 重）· 全屏预览浮层 · 拖拽微调</span>
+      </div>
+      <div class="layer">
+        <span class="tag">L4</span>
+        <span class="name">执行</span>
+        <span class="desc">图标定位 · 文件移动 · 占用检测 · 快照 · 一键回滚</span>
+      </div>
+      <div class="layer agent">
+        <span class="tag">L5</span>
+        <span class="name">接入</span>
+        <span class="desc">内置对话 Agent · MCP Server · 托盘常驻 · 新图标增量检测</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>自由命名的收敛机制</h2>
+    <div class="panel">
+      <div class="sub">自由命名最大的坑是每次跑出不同分类体系——这次「游戏」，下次「游戏娱乐」，再下次「Games」，桌面越整越碎。三层收敛：</div>
+      <ul>
+        <li><b>上下文注入</b>　每次调 LLM 时把已有分组列表传入，要求优先复用，确有必要才新建</li>
+        <li><b>相似度合并</b>　新名与旧名做编辑距离 + 语义相似度比对，超阈值提示「是否并入『游戏』？」</li>
+        <li><b>字典沉淀</b>　所有用过的分组名持久化为本地资产，可手动重命名 / 合并 / 删除</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Rust 技术栈</h2>
+    <div class="stack">
+      <div class="row"><span class="p">crates/shell-win</span><span class="d">Windows Shell COM 封装，唯一 unsafe 集中区</span><span class="s">核心</span></div>
+      <div class="row"><span class="p">crates/core</span><span class="d">采集 / 分类 / 布局 / 执行，无 UI 依赖</span><span class="s">可复用</span></div>
+      <div class="row"><span class="p">crates/storage</span><span class="d">SQLite 持久化（rusqlite + bundled）</span><span class="s"></span></div>
+      <div class="row"><span class="p">crates/mcp</span><span class="d">MCP Server，stdio + http 双模式</span><span class="s">rmcp</span></div>
+      <div class="row hi"><span class="p">crates/app</span><span class="d">Tauri 2 桌面应用 + 托盘</span><span class="s">UI</span></div>
+    </div>
+    <div class="note" style="margin-top:16px;background:#FCEBEB;color:#791F1F">
+      <b>成本要提前认账：</b>COM 样板代码比 C# 多、PIDL 生命周期要手动 <code style="font-family:ui-monospace,monospace">CoTaskMemFree</code>、全屏透明浮层需 <code style="font-family:ui-monospace,monospace">WS_EX_LAYERED + WS_EX_TRANSPARENT</code>。缓解办法是全部收口到 <code style="font-family:ui-monospace,monospace">shell-win</code> 一个 crate，对外只暴露安全 Rust API。万一卡住，可把这一层换成 C# sidecar，其余保持 Rust。
+    </div>
+  </section>
+
+  <section>
+    <h2>路线图</h2>
+    <div class="road">
+      <div class="mile key">
+        <h3>M0 · 可行性验证 <span>1–2 周</span></h3>
+        <p>装 rustup + MSVC Build Tools，跑通图标坐标读写、.lnk 深解析、DPI 兼容。<b>产出：能把图标摆成三列的控制台 Demo。</b></p>
+      </div>
+      <div class="mile key">
+        <h3>M1 · MVP <span>3 周</span></h3>
+        <p>扫描 + 规则引擎 + 分区布局 + 预览浮层 + 轻收纳盒 + 撤销。<b>只做布局，不动文件。</b></p>
+      </div>
+      <div class="mile">
+        <h3>M2 · 移动与收纳 <span>3 周</span></h3>
+        <p>文件移动 + 逐条确认 UI、重收纳盒、完整快照体系、占用检测与敏感文件排除。</p>
+      </div>
+      <div class="mile">
+        <h3>M3 · 智能 <span>3–4 周</span></h3>
+        <p>LLM 双模式、自由命名收敛、自然语言指令、修正学习。</p>
+      </div>
+      <div class="mile">
+        <h3>M4 · 生态 <span>3 周</span></h3>
+        <p>MCP Server 发布、规则市场、工作/娱乐模式切换、增量守护。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Agent 工具契约</h2>
+    <div class="flow">
+      <div class="step"><span class="dot">1</span><div class="txt"><code>desktop_scan</code>　<b>只读</b>　返回桌面条目结构化清单</div></div>
+      <div class="step"><span class="dot">2</span><div class="txt"><code>desktop_list_groups</code>　<b>只读</b>　已有分组，供 LLM 复用避免碎片化</div></div>
+      <div class="step"><span class="dot">3</span><div class="txt"><code>desktop_propose_layout</code>　<b>只读</b>　生成分组方案，带置信度与理由</div></div>
+      <div class="step"><span class="dot">4</span><div class="txt"><code>desktop_apply_layout</code>　<b>写入·可回滚</b>　执行布局，返回 snapshot_id</div></div>
+      <div class="step"><span class="dot">5</span><div class="txt"><code>desktop_move_items</code>　<b>写入·需 confirm</b>　移动文件，逐条返回结果</div></div>
+      <div class="step"><span class="dot">6</span><div class="txt"><code>desktop_undo</code>　<b>写入·可回滚</b>　随时还原到任意快照</div></div>
+    </div>
+  </section>
+
+  <div class="note">
+    <b>分类引擎的真实难点：</b>当前桌面 35 个条目里，<b>Sciland、Yaak、Zed、夸克</b> 四个光看文件名无法判断归属——必须解析快捷方式目标路径、PE 版本信息和图标才能定类。这四个是最佳的引擎验收样本。
+  </div>
+
+</div>
+</body>
+</html>

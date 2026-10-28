@@ -1,0 +1,32 @@
+# Rust 构建产物
+/target/
+**/*.rs.bk
+*.pdb
+
+# Tauri / 前端
+node_modules/
+dist/
+.vite/
+src-tauri/target/
+
+# 构建输出
+*.exe
+*.msi
+*.msix
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 系统文件
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 本地工具目录
+.workbuddy-ai/
+
+# 环境变量
+.env
+.env.local
