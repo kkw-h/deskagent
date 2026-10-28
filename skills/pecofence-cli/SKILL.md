@@ -77,6 +77,8 @@ pecofence-cli item move <id|path|name>... --to Work
 pecofence-cli item move --glob "*.pdf" --from inbox --to Docs --dry-run
 pecofence-cli item rename "C:\Users\me\Desktop\IMG_2031.pdf" "2026-09 electricity bill"   # keeps .pdf
 pecofence-cli rule add --name PDFs --ext pdf --to Docs         # or --type, --name-contains, --glob, --json '[Cond...]'
+pecofence-cli rule add --name Games --company-contains Valve --to Games   # PE version info CompanyName
+pecofence-cli rule add --name Steam --target-contains '\steam\' --to Games # shortcut target path
 pecofence-cli rule apply --dry-run && pecofence-cli rule apply
 pecofence-cli settings set theme dark                          # dotted camelCase path; `settings get` shows them
 pecofence-cli snapshot list

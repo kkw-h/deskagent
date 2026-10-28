@@ -6,27 +6,29 @@
 //!   判定保守：一个扩展名只对应一个分组时才编译。
 //! - [`compile_conds`]：给 `rules.add` 用的完整条件表达式，能把快捷方式也表达出来。
 //!
-//! ## 四种分类信号在 PecoFence 里的可表达性（对源码核对过，别再凭印象）
+//! ## 四种分类信号在 PecoFence 里的可表达性
 //!
 //! | 信号 | PecoFence 条件 | 可表达 |
 //! |---|---|---|
 //! | `ext` | `Cond::Ext` | 是 |
 //! | `name_contains` | `Cond::Name { op: Contains }` | 是 |
 //! | `target_contains` | `Cond::ShortcutTarget { op: Contains }` | 是 |
-//! | `company` | 无对应条件 | **否** |
+//! | `company` | `Cond::Company { op: Contains }` | 是（本轮给 core 新加的） |
 //!
-//! 早先这里写着「没有快捷方式目标路径」，那是错的：`Cond::ShortcutTarget` 一直存在，
-//! 而且 `Rule::new` 会把它归进最高优先级的 `Class::Target`。所以快捷方式并非写不成规则，
-//! 只是要为每个产品写一条，人工成本高。
+//! 这里出过两次判断错误，都记下来免得再犯：
 //!
-//! 真正表达不了的只有 `company`。PE 版本信息里的公司名是 DeskAgent 独有的信号
-//! （PecoFence 的 `ItemFacts` 里没有这个字段），这一部分只能靠常驻守护补。
+//! 1. 早先写着「没有快捷方式目标路径」。错：`Cond::ShortcutTarget` 一直存在，
+//!    而且 `Rule::new` 会把它归进最高优先级的 `Class::Target`。
+//! 2. 接着写着「公司名表达不了」。当时是对的（`ItemFacts` 确实没有这个字段），
+//!    但并入 PecoFence 源码之后可以直接改 core，于是它变成了可表达。
 //!
-//! ## 为什么 `name_contains` 仍然不自动生成
+//! 结论：判断「能不能表达」之前，先确认自己看的是哪个版本、哪份代码。
+//!
+//! ## 为什么 `name_contains` 仍然不默认落地
 //!
 //! 子串规则的误伤率太高：给「游戏」生成 `Name contains 游戏`，
 //! 会把「游戏加加」这种工具也吸进去。所以 `compile_conds` 会产出它，
-//! 但由调用方决定要不要用，不默认落地。
+//! 但由调用方决定要不要用。
 
 use std::collections::BTreeMap;
 
@@ -161,19 +163,16 @@ pub struct CompiledRule {
     pub priority: i32,
 }
 
-/// 分类用到了、但 PecoFence 条件表达不了的信号。
-#[derive(Debug, Clone, PartialEq)]
-pub struct Unrepresentable {
-    pub group: String,
-    /// 目前只有 `"company"`：PE 版本信息里的公司名，`ItemFacts` 没有这个字段。
-    pub kind: &'static str,
-    pub values: Vec<String>,
-}
-
+/// 分类用到的四种信号现在**全部**能表达成 PecoFence 条件了：
+/// `ext` / `name_contains` / `target_contains` / `company` 一一对应到
+/// `Cond::Ext` / `Cond::Name` / `Cond::ShortcutTarget` / `Cond::Company`。
+///
+/// 这里曾经有个 `Unrepresentable` 收集器，专门记录「公司名写不成规则」。
+/// 给 core 加上 `Cond::Company` 之后它恒为空，于是删掉了——
+/// 留一个永远空着的字段只会让调用方写无意义的判空。
 #[derive(Debug, Clone, Default)]
 pub struct CompiledConds {
     pub rules: Vec<CompiledRule>,
-    pub unrepresentable: Vec<Unrepresentable>,
 }
 
 /// 把规则包编译成 PecoFence 原生的 `Cond`。
@@ -239,17 +238,17 @@ pub fn compile_conds(pack: &RulePack) -> CompiledConds {
             });
         }
 
-        let companies: Vec<String> = m
-            .company
-            .iter()
-            .filter(|c| !c.is_empty())
-            .cloned()
-            .collect();
-        if !companies.is_empty() {
-            out.unrepresentable.push(Unrepresentable {
+        // 公司名以前只能记成「不可表达」。并入 PecoFence 源码、给 core 的规则引擎
+        // 加上 Cond::Company 之后，它现在是可表达的，而且是优先级最高的一类。
+        for c in m.company.iter().filter(|c| !c.is_empty()) {
+            out.rules.push(CompiledRule {
                 group: rule.group.clone(),
-                kind: "company",
-                values: companies,
+                cond: Cond::Company {
+                    op: StrOp::Contains,
+                    value: c.to_lowercase(),
+                },
+                source: format!("公司名含 {c}"),
+                priority: rule.priority,
             });
         }
     }
@@ -456,12 +455,12 @@ rules:
                 value: r"\steam\".into()
             }
         );
-        assert!(c.unrepresentable.is_empty());
     }
 
-    /// 公司名没有对应的 Cond，必须如实报出来，不能悄悄丢掉。
+    /// 公司名现在能编译成 `Cond::Company`。这条测试是这轮改造的验收点：
+    /// 在此之前，这条规则会被归到「表达不了」然后丢掉。
     #[test]
-    fn company_is_reported_as_unrepresentable() {
+    fn company_becomes_cond() {
         let p = RulePack::from_yaml(
             r#"
 rules:
@@ -474,13 +473,22 @@ rules:
         )
         .unwrap();
         let c = compile_conds(&p);
-        // target_contains 那一半能表达
-        assert_eq!(c.rules.len(), 1);
-        assert_eq!(c.rules[0].group, "开发");
-        // company 那一半表达不了，但要被记录
-        assert_eq!(c.unrepresentable.len(), 1);
-        assert_eq!(c.unrepresentable[0].kind, "company");
-        assert_eq!(c.unrepresentable[0].values.len(), 2);
+        // 两个 company 值 + 一个 target_contains = 三条
+        assert_eq!(c.rules.len(), 3);
+        let companies: Vec<&Cond> = c
+            .rules
+            .iter()
+            .filter(|r| matches!(r.cond, Cond::Company { .. }))
+            .map(|r| &r.cond)
+            .collect();
+        assert_eq!(companies.len(), 2);
+        assert_eq!(
+            companies[0],
+            &Cond::Company {
+                op: StrOp::Contains,
+                value: "jetbrains".into()
+            }
+        );
     }
 
     /// 同一规则的多个扩展名合并成一条 Cond::Ext，避免规则表膨胀。

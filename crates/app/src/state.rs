@@ -842,12 +842,27 @@ impl AppState {
         } else {
             (None, None)
         };
+        // 公司名来自目标可执行文件的 PE 版本信息（StringFileInfo/CompanyName）。
+        // 这是 DeskAgent 并入后新增的信号：PecoFence 原本的 ItemFacts 里没有这一项，
+        // 所以「Valve 出品的都算游戏」这类规则以前写不出来。
+        //
+        // 只在目标是 .exe 时读。单次解析约几十 KB，桌面几十个条目在毫秒级；
+        // route_decision 也只在新条目出现或手动应用规则时跑，不在渲染循环里。
+        // 如果以后这条路径成了热点，再考虑在 config.items 里缓存。
+        let company = shortcut_target
+            .as_deref()
+            .filter(|t| t.to_lowercase().ends_with(".exe"))
+            .and_then(|t| deskagent_scan::read_version(t))
+            .map(|v| v.company)
+            .filter(|c| !c.is_empty());
+
         pecofence_core::ItemFacts {
             file_name: entry.file_name.clone(),
             is_folder: entry.is_folder,
             size_bytes: entry.size,
             shortcut_target,
             shortcut_target_ext,
+            company,
             created_minutes_local: pecofence_platform::fileinfo::local_time_parts(entry.created)
                 .map(|(m, _)| m),
             created_weekday: pecofence_platform::fileinfo::local_time_parts(entry.created)

@@ -492,6 +492,14 @@ pub struct RuleAddArgs {
     /// File name matches this pattern (* and ?)
     #[arg(long, value_name = "PATTERN", group = "cond")]
     pub glob: Option<String>,
+    /// Shortcut target path contains this text (case-insensitive).
+    /// Only matches shortcuts; `.url` targets are the URL.
+    #[arg(long = "target-contains", value_name = "TEXT", group = "cond")]
+    pub target_contains: Option<String>,
+    /// The target executable's PE version info `CompanyName` contains this text
+    /// (case-insensitive). Only matches items whose company name can be read.
+    #[arg(long = "company-contains", value_name = "TEXT", group = "cond")]
+    pub company_contains: Option<String>,
     /// Only folders
     #[arg(long, group = "cond", conflicts_with = "files_only")]
     pub folders_only: bool,

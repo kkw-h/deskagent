@@ -20,6 +20,9 @@ pecofence-core = { path = "../core" }
 pecofence-ipc = { path = "../ipc" }
 pecofence-platform = { path = "../platform" }
 pecofence-render = { path = "../render" }
+# 读目标可执行文件的 PE 版本信息，给规则引擎的 company 条件提供数据。
+# 纯 Rust（pelite），不引入新的系统依赖。
+deskagent-scan = { path = "../scan" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 

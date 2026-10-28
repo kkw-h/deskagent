@@ -807,6 +807,18 @@ pub fn build_conds(args: &RuleAddArgs) -> Result<Vec<Cond>, IpcError> {
     if let Some(glob) = &args.glob {
         conds.push(Cond::Glob(glob.clone()));
     }
+    if let Some(value) = &args.target_contains {
+        conds.push(Cond::ShortcutTarget {
+            op: StrOp::Contains,
+            value: value.clone(),
+        });
+    }
+    if let Some(value) = &args.company_contains {
+        conds.push(Cond::Company {
+            op: StrOp::Contains,
+            value: value.clone(),
+        });
+    }
     if args.folders_only {
         conds.push(Cond::FoldersOnly);
     }
@@ -1225,12 +1237,39 @@ mod tests {
             ends_with: None,
             name_is: None,
             glob: None,
+            target_contains: None,
+            company_contains: None,
             folders_only: false,
             files_only: false,
             plain_files: false,
             json: None,
             index: None,
         }
+    }
+
+    /// 公司名和快捷方式目标这两个条件，之前 `rule add` 根本没暴露成参数，
+    /// 导致「PecoFence 表达不了 target_path」的错误结论。现在钉住。
+    #[test]
+    fn company_and_target_conditions_come_from_flags() {
+        let mut a = add_args();
+        a.company_contains = Some("Valve".into());
+        assert_eq!(
+            build_conds(&a).unwrap(),
+            vec![Cond::Company {
+                op: StrOp::Contains,
+                value: "Valve".into()
+            }]
+        );
+
+        let mut a = add_args();
+        a.target_contains = Some(r"\steam\".into());
+        assert_eq!(
+            build_conds(&a).unwrap(),
+            vec![Cond::ShortcutTarget {
+                op: StrOp::Contains,
+                value: r"\steam\".into()
+            }]
+        );
     }
 
     #[test]

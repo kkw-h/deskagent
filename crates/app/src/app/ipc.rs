@@ -1424,6 +1424,13 @@ impl App {
                     ".url" => Some(".url".into()),
                     _ => None,
                 },
+                // 与 state.rs 的 facts_at 保持一致：目标可执行文件的公司名。
+                company: shortcut_target
+                    .as_deref()
+                    .filter(|t| t.to_lowercase().ends_with(".exe"))
+                    .and_then(|t| deskagent_scan::read_version(t))
+                    .map(|v| v.company)
+                    .filter(|c| !c.is_empty()),
                 ..Default::default()
             };
             rules::classify(&facts)

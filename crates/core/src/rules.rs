@@ -80,9 +80,10 @@ pub struct Rule {
 
 impl Rule {
     pub fn new(name: &str, target: Target, all_of: Vec<Cond>) -> Self {
+        // 公司名和快捷方式目标一样，是最强的语义信号，都归最高优先级类。
         let priority_class = if all_of
             .iter()
-            .any(|c| matches!(c, Cond::ShortcutTarget { .. }))
+            .any(|c| matches!(c, Cond::ShortcutTarget { .. } | Cond::Company { .. }))
         {
             Class::Target
         } else if all_of
@@ -162,6 +163,15 @@ pub enum Cond {
         op: StrOp,
         value: String,
     },
+    /// PE 版本信息里的公司名（`StringFileInfo` 的 `CompanyName`）。
+    ///
+    /// 这是 DeskAgent 带来的信号：一个 `CompanyName = Valve` 的快捷方式，
+    /// 靠文件名或目标路径都不一定认得出是游戏，靠公司名可以。
+    /// 读不到公司名时（非 PE 文件、资源被裁剪、`.url`）恒为不匹配。
+    Company {
+        op: StrOp,
+        value: String,
+    },
     FoldersOnly,
     FilesOnly,
     /// A file that is not a program, a shortcut or a shell namespace item (This PC, Recycle
@@ -198,6 +208,8 @@ pub struct ItemFacts {
     pub shortcut_target: Option<String>,
     /// Extension of the shortcut target (e.g. `.exe`), lower-case with dot.
     pub shortcut_target_ext: Option<String>,
+    /// Company name from the target's PE version info; `None` when it cannot be read.
+    pub company: Option<String>,
     pub created_minutes_local: Option<u16>,
     pub created_weekday: Option<u8>,
     pub origin: Origin,
@@ -436,6 +448,11 @@ pub fn cond_matches(cond: &Cond, facts: &ItemFacts) -> bool {
             .as_deref()
             .map(|t| str_op(*op, t, value))
             .unwrap_or(false),
+        Cond::Company { op, value } => facts
+            .company
+            .as_deref()
+            .map(|c| str_op(*op, c, value))
+            .unwrap_or(false),
         Cond::FoldersOnly => facts.is_folder,
         Cond::FilesOnly => !facts.is_folder,
         Cond::PlainFiles => {
@@ -672,6 +689,100 @@ mod tests {
             origin: Origin::UserDesktop,
             ..Default::default()
         }
+    }
+
+    // ---------------------------------------------------- company 条件
+    //
+    // 这是 DeskAgent 并入后新增的信号。它存在的理由很具体：一个叫 `Steam.lnk` 的条目
+    // 靠文件名只能猜到是游戏，靠 `CompanyName = Valve Corporation` 则是确定的。
+
+    #[test]
+    fn company_cond_matches_the_version_info_field() {
+        let mut f = facts("Steam.lnk");
+        f.company = Some("Valve Corporation".into());
+        assert!(cond_matches(
+            &Cond::Company {
+                op: StrOp::Contains,
+                value: "valve".into()
+            },
+            &f
+        ));
+        assert!(!cond_matches(
+            &Cond::Company {
+                op: StrOp::Contains,
+                value: "epic".into()
+            },
+            &f
+        ));
+    }
+
+    /// 读不到公司名时必须恒为不匹配。空条件不能变成「放行」——
+    /// 那会让一条写错的条件把桌面上所有条目都吸进同一个栅栏。
+    #[test]
+    fn company_cond_never_matches_when_unknown() {
+        let f = facts("readme.txt");
+        assert!(f.company.is_none());
+        assert!(!cond_matches(
+            &Cond::Company {
+                op: StrOp::Contains,
+                value: String::new()
+            },
+            &f
+        ));
+    }
+
+    /// 公司名和快捷方式目标同属最高优先级：它们都是「这是什么软件」的确定答案，
+    /// 不应该被扩展名或文件名规则抢在前面。
+    #[test]
+    fn company_rules_sort_with_target_class() {
+        let r = Rule::new(
+            "游戏",
+            Target::Inbox,
+            vec![Cond::Company {
+                op: StrOp::Contains,
+                value: "valve".into(),
+            }],
+        );
+        assert_eq!(r.priority_class, Class::Target);
+    }
+
+    #[test]
+    fn company_cond_survives_a_json_round_trip() {
+        let c = Cond::Company {
+            op: StrOp::Contains,
+            value: "valve".into(),
+        };
+        let v = serde_json::to_value(&c).unwrap();
+        assert_eq!(v["cond"], "company");
+        let back: Cond = serde_json::from_value(v).unwrap();
+        assert_eq!(back, c);
+    }
+
+    /// 完整链路：一条 company 规则能把条目路由到指定栅栏。
+    #[test]
+    fn company_rule_routes_the_item() {
+        let fence = Uuid::new_v4();
+        let rs = RuleSet {
+            default_target: Target::Inbox,
+            keep_updated: true,
+            unmatched: Unmatched::DefaultTarget,
+            list: vec![Rule::new(
+                "游戏",
+                Target::Fence(fence),
+                vec![Cond::Company {
+                    op: StrOp::Contains,
+                    value: "valve".into(),
+                }],
+            )],
+        };
+        let mut steam = facts("Steam.lnk");
+        steam.company = Some("Valve Corporation".into());
+        match rs.evaluate(&steam) {
+            Decision::Route { target, .. } => assert_eq!(target, Target::Fence(fence)),
+            other => panic!("期望路由到游戏栅栏，得到 {other:?}"),
+        }
+        // 没有公司名的条目仍走默认目标
+        assert_eq!(rs.evaluate(&facts("notes.txt")), Decision::Default(Target::Inbox));
     }
 
     #[test]
