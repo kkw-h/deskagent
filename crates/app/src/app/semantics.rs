@@ -12,6 +12,14 @@ use std::path::Path;
 /// 一次语义整理最多新建多少个栅栏：防止规则包被意外改坏时把桌面铺满。
 const MAX_NEW_SEMANTIC_FENCES: usize = 8;
 
+/// 语义整理后变空的栅栏（预览和落地共用同一份判断）。
+struct Emptied {
+    id: FenceId,
+    title: String,
+    /// 指向它的规则条数：删除栅栏前会把它们改为指向「桌面」。
+    rules: usize,
+}
+
 impl App {
     /// 与 `sync_desktop_if_available` 相同的枚举口径（含隐藏真实图标时的系统项）。
     pub(super) fn semantic_entries(&self) -> Vec<shell::DesktopEntry> {
@@ -25,6 +33,7 @@ impl App {
     /// 只计算不修改：给设置页预览用。
     pub(super) fn semantic_plan_json(&self, min_items: usize) -> Value {
         let plan = sem::plan(&self.semantic_entries(), min_items);
+        let prune = self.fences_emptied_by(&plan);
         // 预览也会写一行日志：没有设置窗口时（脚本、CLI）它是唯一能看到结果的途径。
         tracing::info!(
             total = plan.total,
@@ -35,6 +44,7 @@ impl App {
                 .map(|g| (g.title.as_str(), g.items.len()))
                 .collect::<Vec<_>>(),
             unclassified = plan.unclassified.len(),
+            prune = ?prune.iter().map(|p| p.title.as_str()).collect::<Vec<_>>(),
             min_items,
             "semantic plan"
         );
@@ -61,22 +71,77 @@ impl App {
                 .iter()
                 .map(|i| json!({ "name": i.name, "detail": i.detail }))
                 .collect::<Vec<_>>(),
+            "prune": prune
+                .iter()
+                .map(|p| json!({ "id": p.id.to_string(), "title": p.title, "rules": p.rules }))
+                .collect::<Vec<_>>(),
         })
     }
 
-    /// 把语义分类真正落到桌面：先存快照，再建栅栏、移条目。
+    /// 语义整理后会是空的栅栏（「桌面」和文件夹门户除外）。
+    ///
+    /// 预览和落地共用这一个判断：面板里说「会变空」，落地时就应该真的删掉。
+    fn fences_emptied_by(&self, plan: &sem::Plan) -> Vec<Emptied> {
+        let moving: std::collections::HashSet<&str> = plan
+            .groups
+            .iter()
+            .flat_map(|g| g.items.iter().map(|i| i.path.as_str()))
+            .collect();
+        let inbox = self.state.inbox_id();
+        self.state
+            .fences()
+            .iter()
+            .filter(|f| f.kind != FenceKind::FolderPortal && Some(f.id) != inbox)
+            // 这一组要搬进去的栅栏不算：它的条目只是换了个位置。
+            .filter(|f| {
+                !plan
+                    .groups
+                    .iter()
+                    .any(|g| g.title.eq_ignore_ascii_case(&f.title))
+            })
+            .filter(|f| {
+                f.items.iter().all(|r| {
+                    self.state
+                        .item(r.item_id)
+                        .and_then(|it| it.path.as_deref())
+                        .is_some_and(|p| moving.contains(p))
+                })
+            })
+            .map(|f| Emptied {
+                id: f.id,
+                title: f.title.clone(),
+                rules: self
+                    .state
+                    .config
+                    .rules
+                    .list
+                    .iter()
+                    .filter(|r| r.target == Target::Fence(f.id))
+                    .count(),
+            })
+            .collect()
+    }
+
+    /// 把语义分类真正落到桌面：先存快照，再建栅栏、移条目，最后清掉变空的栅栏。
     pub(super) fn semantic_apply(
         &mut self,
         min_items: usize,
+        prune_empty: bool,
     ) -> std::result::Result<Value, IpcError> {
         let plan = sem::plan(&self.semantic_entries(), min_items);
-        if plan.is_empty() {
+        let emptied = if prune_empty {
+            self.fences_emptied_by(&plan)
+        } else {
+            Vec::new()
+        };
+        if plan.is_empty() && emptied.is_empty() {
             return Ok(mutation(
                 false,
                 None,
                 json!({
                     "moved": 0,
                     "created": 0,
+                    "pruned": [],
                     "groups": [],
                     "unclassified": unclassified_json(&plan),
                 }),
@@ -112,18 +177,37 @@ impl App {
                 "fence": fence.to_string(),
             }));
         }
-        if moved > 0 {
+        // 清掉已是空壳的默认栅栏：它们的规则改为指向「桌面」，栅栏本身删掉。
+        // 规则保留在列表里（用户可改回去），快照回不了规则，所以不做删除。
+        let mut pruned = Vec::new();
+        for gone in &emptied {
+            let mut retargeted = 0usize;
+            for rule in &mut self.state.config.rules.list {
+                if rule.target == Target::Fence(gone.id) {
+                    rule.target = Target::Inbox;
+                    retargeted += 1;
+                }
+            }
+            if self.state.delete_fence(gone.id) {
+                pruned.push(json!({
+                    "title": gone.title,
+                    "rules": retargeted,
+                }));
+            }
+        }
+        if moved > 0 || !pruned.is_empty() {
             self.refresh_all();
             self.schedule_save();
             self.push_settings_state();
         }
-        tracing::info!(moved, created, "semantic apply");
+        tracing::info!(moved, created, pruned = pruned.len(), "semantic apply");
         Ok(mutation(
-            moved > 0 || created > 0,
+            moved > 0 || created > 0 || !pruned.is_empty(),
             snapshot,
             json!({
                 "moved": moved,
                 "created": created,
+                "pruned": pruned,
                 "groups": groups,
                 "unclassified": unclassified_json(&plan),
             }),
@@ -176,7 +260,7 @@ impl App {
                     && self
                         .state
                         .item_id_for_path(&e.path)
-                        .is_some_and(|id| self.item_in_inbox(id))
+                        .is_some_and(|id| !self.assigned_by_user(id))
             })
             .cloned()
             .collect();
@@ -206,7 +290,7 @@ impl App {
                 .items
                 .iter()
                 .filter_map(|i| self.state.item_by_path(Path::new(&i.path)))
-                .filter(|id| self.item_in_inbox(*id))
+                .filter(|id| !self.assigned_by_user(*id))
                 .collect();
             if ids.is_empty() {
                 continue;
@@ -219,11 +303,13 @@ impl App {
         }
     }
 
-    fn item_in_inbox(&self, id: ItemId) -> bool {
-        self.state
-            .inbox_id()
-            .and_then(|inbox| self.state.fence(inbox))
-            .is_some_and(|f| f.items.iter().any(|r| r.item_id == id))
+    /// 条目是否被用户自己摆进某个栅栏：语义整理不碰这些。
+    fn assigned_by_user(&self, id: ItemId) -> bool {
+        self.state.fences().iter().any(|f| {
+            f.items
+                .iter()
+                .any(|r| r.item_id == id && r.assigned_by == pecofence_core::AssignedBy::User)
+        })
     }
 }
 

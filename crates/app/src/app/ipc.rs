@@ -832,9 +832,12 @@ impl App {
                 let min = min_items.unwrap_or(crate::semantics::DEFAULT_MIN_ITEMS);
                 Ok(self.semantic_plan_json(min))
             }
-            Method::SemanticsApply { min_items } => {
+            Method::SemanticsApply {
+                min_items,
+                prune_empty,
+            } => {
                 let min = min_items.unwrap_or(crate::semantics::DEFAULT_MIN_ITEMS);
-                self.semantic_apply(min)
+                self.semantic_apply(min, *prune_empty)
             }
 
             Method::SnapshotsSave { name } => {

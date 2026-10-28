@@ -1193,6 +1193,7 @@
   function renderSemantics(plan) {
     const groups = plan.groups || [];
     const unclassified = plan.unclassified || [];
+    const prune = plan.prune || [];
     document.getElementById('semanticSummary').textContent = groups.length
       ? tf("共 {0} 个分组，{1} 个项目", groups.length, plan.moved)
       : t("没有值得单独建栅栏的分组");
@@ -1210,8 +1211,14 @@
       div.innerHTML = `<div class="s">${esc(tf("留在桌面：{0} 个项目", unclassified.length))}</div>`;
       list.appendChild(div);
     }
+    if (prune.length) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = `<div class="s">${esc(tf("整理后清理 {0} 个空栅栏：{1}", prune.length, prune.map(p => p.title).join(t("、"))))}</div>`;
+      list.appendChild(div);
+    }
     document.getElementById('semanticPreview').hidden = false;
-    document.getElementById('semanticApply').disabled = !groups.length;
+    document.getElementById('semanticApply').disabled = !groups.length && !prune.length;
   }
   document.getElementById('semanticPlan').onclick = () => send({ type: 'action', name: 'semanticsPlan' });
   document.getElementById('semanticCancel').onclick = () => { document.getElementById('semanticPreview').hidden = true; };

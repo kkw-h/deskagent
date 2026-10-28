@@ -265,12 +265,15 @@ pub enum Method {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         min_items: Option<usize>,
     },
-    /// 语义分类落地：先存快照，再按分组建栅栏（同名复用）并移入条目。Result:
-    /// `{changed, moved, created, groups: [{title, count, moved, created, fence}], unclassified, snapshotId?}`.
+    /// 语义分类落地：先存快照，再按分组建栅栏（同名复用）并移入条目。`pruneEmpty` 还会删掉
+    /// 整理后变空的栅栏，并把指向它们的规则改为放入「桌面」（规则保留在列表里，可改回去）。
+    /// Result: `{changed, moved, created, pruned: [{title, rules}], groups: [...], unclassified, snapshotId?}`.
     #[serde(rename = "semantics.apply")]
     SemanticsApply {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         min_items: Option<usize>,
+        #[serde(default)]
+        prune_empty: bool,
     },
     /// `id` = snapshot id (or unique prefix) or name. A snapshot of the current layout is
     /// taken first unless the list is full of user snapshots (then `warning` says so and
@@ -717,7 +720,14 @@ mod tests {
             Method::RulesApply { dry_run: true },
             Method::SemanticsPlan { min_items: Some(2) },
             Method::SemanticsPlan { min_items: None },
-            Method::SemanticsApply { min_items: Some(2) },
+            Method::SemanticsApply {
+                min_items: Some(2),
+                prune_empty: true,
+            },
+            Method::SemanticsApply {
+                min_items: None,
+                prune_empty: false,
+            },
             Method::SnapshotsSave { name: "x".into() },
             Method::SnapshotsRestore { id: "x".into() },
             Method::SnapshotsDelete { id: "x".into() },
@@ -849,7 +859,13 @@ mod tests {
         );
         // 语义整理：预览是只读的，落地会建栅栏、移条目。
         assert!(!Method::SemanticsPlan { min_items: None }.is_mutation());
-        assert!(Method::SemanticsApply { min_items: None }.is_mutation());
+        assert!(
+            Method::SemanticsApply {
+                min_items: None,
+                prune_empty: false
+            }
+            .is_mutation()
+        );
         assert_eq!(
             Method::SemanticsPlan { min_items: None }.name(),
             "semantics.plan"

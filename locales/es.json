@@ -560,5 +560,7 @@
   "公司名包含“{0}”": "El nombre de la empresa contiene «{0}»",
   "请输入公司名关键字": "Escribe parte del nombre de la empresa",
   "已按软件语义整理 {0} 个项目": "{0} elementos organizados por tipo de aplicación",
-  "先看快捷方式目标规则，再按软件语义归类；都不符合的放进“桌面”栅栏": "Comprueba primero las reglas de destino de los accesos directos y luego agrupa por tipo de aplicación; lo que no encaje va a la valla «Escritorio»"
+  "先看快捷方式目标规则，再按软件语义归类；都不符合的放进“桌面”栅栏": "Comprueba primero las reglas de destino de los accesos directos y luego agrupa por tipo de aplicación; lo que no encaje va a la valla «Escritorio»",
+  "已按软件语义整理 {0} 个项目，清掉 {1} 个空栅栏": "{0} elementos organizados por tipo de aplicación, {1} vallas vacías eliminadas",
+  "整理后清理 {0} 个空栅栏：{1}": "Elimina {0} vallas vacías: {1}"
 }

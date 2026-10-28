@@ -507,13 +507,26 @@ impl App {
                 }
                 Some("semanticsApply") => {
                     let min = crate::semantics::DEFAULT_MIN_ITEMS;
-                    match self.semantic_apply(min) {
+                    // 预览里已经写明会清掉哪些空栅栏，确认之后才真的删。
+                    match self.semantic_apply(min, true) {
                         Ok(result) => {
                             let moved = result.get("moved").and_then(|v| v.as_u64()).unwrap_or(0);
-                            let message = pecofence_core::i18n::format(
-                                "已按软件语义整理 {0} 个项目",
-                                &[moved.to_string()],
-                            );
+                            let pruned = result
+                                .get("pruned")
+                                .and_then(|v| v.as_array())
+                                .map(|a| a.len())
+                                .unwrap_or(0);
+                            let message = if pruned > 0 {
+                                pecofence_core::i18n::format(
+                                    "已按软件语义整理 {0} 个项目，清掉 {1} 个空栅栏",
+                                    &[moved.to_string(), pruned.to_string()],
+                                )
+                            } else {
+                                pecofence_core::i18n::format(
+                                    "已按软件语义整理 {0} 个项目",
+                                    &[moved.to_string()],
+                                )
+                            };
                             self.settings_toast(&message);
                         }
                         Err(e) => self.settings_error(&e.to_string()),
